@@ -7,7 +7,7 @@ private:
     double slope;
     double intercept;
     KeyType base_key;
-    
+
 public:
     std::vector<DataPoint> data;
 

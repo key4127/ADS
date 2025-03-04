@@ -3,6 +3,8 @@
 #include "base.h"
 #include "linear_model.h"
 
+#include <cstdio>
+
 class DecisionTreeModel : public Model {
   class TreeNode {
    public:
@@ -12,7 +14,7 @@ class DecisionTreeModel : public Model {
 
   class LeafNode : public TreeNode {
   public: 
-    std::vector<DataPoint> pairs;
+    LinearModel leafModel;
 
     std::optional<ValueType> predict(KeyType key) const {
       
@@ -45,9 +47,12 @@ class DecisionTreeModel : public Model {
     if (end - begin < default_max_leaf_samples) {
       std::unique_ptr<LeafNode> r = std::make_unique<LeafNode>();
 
+      //printf("len: %d\n", end - begin);
       for (int i = begin; i < end; i++) {
-        r->pairs.insert(r->pairs.end(), data[i]);
+        r->leafModel.data.insert(r->leafModel.data.end(), data[i]);
+        //printf("key = %d, value = %d\n", data[i].key, data[i].value);
       }
+      //printf("\n");
 
       return r;
 
@@ -55,13 +60,16 @@ class DecisionTreeModel : public Model {
       std::unique_ptr<InternalNode> r = std::make_unique<InternalNode>();
 
       int len = (end - begin) / 2;
-      r->split_key = 0;
+      r->split_key = data[begin + len].key;
       r->left = build_tree_helper(data, begin, begin + len);
       r->right = build_tree_helper(data, begin + len, end);
 
       return r;
     }
   }
+
+  void trainInternal(InternalNode* r);
+  void trainLeaf(LeafNode *r);
 
  public:
   DecisionTreeModel() {};

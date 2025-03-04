@@ -8,7 +8,9 @@ void LearnedIndex::load_data(const std::string& data_path) {
 
 std::vector<DataPoint>& LearnedIndex::data() { return data_loader.get_data(); }
 
-void LearnedIndex::train() {}
+void LearnedIndex::train() {
+  root_model->train(this->data());
+}
 
 std::optional<ValueType> LearnedIndex::predict(KeyType key) const {
   return std::nullopt;
