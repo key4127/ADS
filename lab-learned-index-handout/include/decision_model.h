@@ -32,7 +32,9 @@ class DecisionTreeModel : public Model {
     }
   };
 
- private:
+private:
+  std::unique_ptr<TreeNode> root;
+
   double compute_split_loss(const std::vector<DataPoint>& data,
                             size_t split_idx);  // In README Others.
   double compute_variance(const std::vector<DataPoint>& data, size_t start,

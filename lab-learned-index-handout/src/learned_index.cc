@@ -13,7 +13,7 @@ void LearnedIndex::train() {
 }
 
 std::optional<ValueType> LearnedIndex::predict(KeyType key) const {
-  return std::nullopt;
+  return root_model->predict(key);
 }
 
 std::optional<ValueType> LearnedIndex::operator[](KeyType key) const {

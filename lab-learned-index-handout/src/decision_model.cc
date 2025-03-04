@@ -5,7 +5,8 @@
 #include <queue>
 
 void DecisionTreeModel::train(const std::vector<DataPoint>& data) {
-  std::unique_ptr<TreeNode> root = build_tree(data);
+  std::unique_ptr<TreeNode> tmp = build_tree(data);
+  root = std::move(tmp);
 
   if (typeid(*root) == typeid(LeafNode)) {
     LeafNode* r = static_cast<LeafNode*>(root.get());
