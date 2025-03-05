@@ -5,6 +5,8 @@
 // debug
 #include <cstdio> 
 
+#include <cmath>
+
 void LinearModel::train(const std::vector<DataPoint>& data) {
   base_key = data[0].key;
 
@@ -37,9 +39,40 @@ void LinearModel::train(const std::vector<DataPoint>& data) {
 std::unordered_map<KeyType, int32_t> grade_key_to_predict_position{};
 
 std::optional<ValueType> LinearModel::predict(KeyType key) const {
-  int32_t predicted_position = 0;
+  //int32_t predicted_position = (key - base_key) * slope + intercept;
+  int32_t predicted_position = static_cast<int32_t>(std::round((key - base_key) * slope + intercept));
+  if (predicted_position < 0) {
+    predicted_position = 0;
+  }
 
   grade_key_to_predict_position[key] = predicted_position;
 
-  return predicted_position;
+  ValueType value = 0;
+  bool find_value = false;
+  for (int i = predicted_position - epsilon; i <= predicted_position + epsilon; i++) {
+    if (i >= data.size()) {
+      break;
+    }
+    if (data[i].key == key) {
+      value = data[i].value;
+      find_value = true;
+      break;
+    }
+  }
+
+  if (!find_value) {
+    for (auto point : data) {
+      if (point.key == key) {
+        value = point.value;
+        find_value = true;
+        break;
+      }
+    }
+  }
+
+  if (!find_value) {
+    return std::nullopt;
+  } else {
+    return value;
+  }
 }

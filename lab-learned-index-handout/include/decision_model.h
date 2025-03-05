@@ -17,7 +17,7 @@ class DecisionTreeModel : public Model {
     LinearModel leafModel;
 
     std::optional<ValueType> predict(KeyType key) const {
-      
+      return leafModel.predict(key);      
     }
   };
 
@@ -28,7 +28,11 @@ class DecisionTreeModel : public Model {
     std::unique_ptr<TreeNode> right;
 
     std::optional<ValueType> predict(KeyType key) const {
-      
+      if (key >= split_key) {
+        return right->predict(key);
+      } else {
+        return left->predict(key);
+      }
     }
   };
 

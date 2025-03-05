@@ -40,7 +40,5 @@ void DecisionTreeModel::trainLeaf(LeafNode* r) {
 }
 
 std::optional<ValueType> DecisionTreeModel::predict(KeyType key) const {
-  
-
-  return std::nullopt;
+  return root->predict(key);
 }
