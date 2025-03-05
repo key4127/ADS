@@ -51,7 +51,7 @@ gen_input(int element_count, uint64_t seed)
 }
 
 constexpr int QUERY_TIMES = 10000;
-constexpr long SEED = 54321;
+constexpr long SEED = 15;
 
 void mainFunc(int element_count, double p) {
 	auto input = gen_input(element_count, SEED);
