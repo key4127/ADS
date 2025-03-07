@@ -31,6 +31,12 @@ class LearnedIndex {
       root_model = nullptr;
     }
     load_data(data_path);
+    if (model == "Linear") {
+      LinearModel* m = static_cast<LinearModel*>(root_model.get());
+      for (auto point : data_loader.get_data()) {
+        m->data.insert(m->data.end(), point);
+      }
+    }
     train();
   }
 

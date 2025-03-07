@@ -43,7 +43,7 @@ void test_decision_tree_model(std::string data_path) {
 }
 
 int main(int argc, char **argv) {
-  std::string test_name = "normal_100000";
+  std::string test_name = "normal_10000";
   std::string data_path = "./data/" + test_name + ".csv";
 
   test_std_map(data_path);
