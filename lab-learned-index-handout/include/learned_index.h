@@ -37,7 +37,15 @@ class LearnedIndex {
         m->data.insert(m->data.end(), point);
       }
     }
+    clock_t begin, end;
+    begin = clock();
     train();
+    end = clock();
+    if (model == "Linear") {
+      printf("linear model write: %lfms\n", (end - begin) * 1000.0 / CLOCKS_PER_SEC);
+    } else {
+      printf("decision model write: %lfms\n", (end - begin) * 1000.0 / CLOCKS_PER_SEC);
+    }
   }
 
   std::vector<DataPoint>& data();
