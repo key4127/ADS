@@ -34,3 +34,6 @@ Thumbs.db
 persistence
 bench
 correctness
+
+# Ignore lab2 pdf cause it's too large
+Project-LSM-tree-v1.1.pdf
