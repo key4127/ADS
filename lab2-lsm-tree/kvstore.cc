@@ -148,11 +148,22 @@ std::string KVStore::get(uint64_t key) //
  * Returns false iff the key is not found.
  */
 bool KVStore::del(uint64_t key) {
+    /*
     std::string res = get(key);
     if (!res.length())
         return false; // not exist
     put(key, DEL);    // put a del marker
     return true;
+    */
+
+    std::string res = get(key);
+    bool result = s->del(key);
+    put(key, DEL);
+    if (result && res != DEL) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /**

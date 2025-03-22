@@ -59,7 +59,7 @@ public:
     int randLevel();
     void insert(uint64_t key, const std::string &str);
     std::string search(uint64_t key);
-    bool del(uint64_t key, uint32_t len);
+    bool del(uint64_t key);
     void scan(uint64_t key1, uint64_t key2, std::vector<std::pair<uint64_t, std::string>> &list);
     slnode *lowerBound(uint64_t key);
     void reset();
