@@ -283,11 +283,12 @@ void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, s
 
 
 void KVStore::compaction() {
-    /*int curLevel = 0;
+    int curLevel = 0;
     // TODO here
     if (sstableIndex[0].size() <= 2) {
         return;
     }
+    //printf("compaction begin\n");
 
     std::vector<sstable> newTables;
     std::vector<sstablehead> toMergeHeads;
@@ -295,6 +296,7 @@ void KVStore::compaction() {
     int maxSSNum = 2, toMerge = sstableIndex[0].size();
     uint64_t lowerBound = INF, upperBound = 0;
     int toMergeTableNums = 0;
+    //printf("compaction preapre\n");
 
     for (int level = 0; level <= totalLevel; level++) {
 
@@ -378,7 +380,8 @@ void KVStore::compaction() {
         newTables.back().putFile(newTables.back().getFilename().data());
 
         maxSSNum *= 2;
-    }*/
+    }
+    //printf("a compaction ends\n");
 }
 
 void KVStore::delsstable(std::string filename) {

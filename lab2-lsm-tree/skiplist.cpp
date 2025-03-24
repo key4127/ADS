@@ -39,7 +39,7 @@ void skiplist::insert(uint64_t key, const std::string &str)
             node->nxt[level] = update[level]->nxt[level];
             update[level]->nxt[level] = node;
         }
-        this->bytes += (12 + current->val.length());
+        this->bytes += (12 + str.length());
     }
 }
 
