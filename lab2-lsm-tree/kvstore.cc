@@ -12,6 +12,8 @@
 #include <string>
 #include <utility>
 
+#include <fstream>
+
 static const std::string DEL = "~DELETED~";
 const uint32_t MAXSIZE       = 2 * 1024 * 1024;
 
@@ -142,7 +144,7 @@ std::string KVStore::get(uint64_t key) //
         return "";
     return res;
 }
-
+#include<iostream>
 /**
  * Delete the given key-value pair if it exists.
  * Returns false iff the key is not found.
@@ -159,7 +161,7 @@ bool KVStore::del(uint64_t key) {
     std::string res = get(key);
     bool result = s->del(key);
     put(key, DEL);
-    if (result && res != DEL) {
+    if (result && res != "") {
         return true;
     } else {
         return false;
@@ -281,8 +283,102 @@ void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, s
 
 
 void KVStore::compaction() {
-    int curLevel = 0;
+    /*int curLevel = 0;
     // TODO here
+    if (sstableIndex[0].size() <= 2) {
+        return;
+    }
+
+    std::vector<sstable> newTables;
+    std::vector<sstablehead> toMergeHeads;
+    std::list<std::pair<uint64_t, std::string>> list;
+    int maxSSNum = 2, toMerge = sstableIndex[0].size();
+    uint64_t lowerBound = INF, upperBound = 0;
+    int toMergeTableNums = 0;
+
+    for (int level = 0; level <= totalLevel; level++) {
+
+        // num to merge
+        if (level) {
+            if (sstableIndex[level].size() <= maxSSNum) {
+                break;
+            } else {
+                toMerge = sstableIndex[level].size() - maxSSNum;
+            }
+        }
+
+        // find tables to merge in this level
+        std::sort(sstableIndex[level].begin(), sstableIndex[level].end());
+
+        // save terms to be merged
+        std::vector<poi> toMergePairs;
+        for (int i = 0; i < toMerge; i++) {
+            lowerBound = std::min(lowerBound, sstableIndex[level][0].getMinV());
+            upperBound = std::max(upperBound, sstableIndex[level][0].getMaxV());
+
+            poi tmp;
+            tmp.sstableId = ++toMergeTableNums;
+            tmp.time = sstableIndex[level][0].getTime();
+
+            for (int j = 0; j < sstableIndex[level][0].getCnt(); j++) {
+                tmp.pos = j;
+                tmp.index = sstableIndex[level][0].getIndexById(j);
+                toMergePairs.push_back(tmp);
+            }
+
+            toMergeHeads.push_back(sstableIndex[level][0]);
+            sstableIndex[level].erase(sstableIndex[level].begin());
+        }
+        if (level != totalLevel) {
+            for (int i = 0; i < sstableIndex[level + 1].size(); i++) {
+                poi tmp;
+                tmp.sstableId = toMergeTableNums;
+                tmp.time = sstableIndex[level + 1][i].getTime();
+
+                if (sstableIndex[level + 1][i].getMinV() <= upperBound || sstableIndex[level + 1][i].getMaxV() >= lowerBound) {
+                    for (int j = 0; j < sstableIndex[level + 1][i].getCnt(); j++) {
+                        tmp.pos = j;
+                        tmp.index = sstableIndex[level][i].getIndexById(j);
+                        toMergePairs.push_back(tmp);
+                    }
+
+                    toMergeTableNums++;
+                    toMergeHeads.push_back(sstableIndex[level + 1][i]);
+                    sstableIndex[level + 1].erase(sstableIndex[level + 1].begin() + i);
+                    i--;
+                }
+            }
+        }
+
+        // create new SSTables
+        sstable newTable;
+        std::sort(toMergePairs.begin(), toMergePairs.end(), cmpPoi());
+        for (int i = 0; i < toMergePairs.size(); i++) {
+            poi p = toMergePairs[i];
+            int64_t key = p.index.key;
+            uint32_t len;
+            std::string val = fetchString(toMergeHeads[p.sstableId].getFilename(), p.pos, len);
+            int l = p.sstableId < toMerge ? level : level + 1;
+
+            if (newTables.empty() || (!newTables.empty() && newTables.back().checkSize(val, l, false))) {
+                newTable = sstable();
+                newTables.push_back(newTable);
+            }
+
+            newTable.insert(key, val);
+        }
+
+        // save new SSTables
+        if (level == totalLevel) {
+            totalLevel++;
+        }
+        for (auto table : newTables) {
+            addsstable(table, level + 1);
+        }
+        newTables.back().putFile(newTables.back().getFilename().data());
+
+        maxSSNum *= 2;
+    }*/
 }
 
 void KVStore::delsstable(std::string filename) {
@@ -324,4 +420,9 @@ char strBuf[2097152];
  */
 std::string KVStore::fetchString(std::string file, int startOffset, uint32_t len) {
     // TODO here
+    std::ifstream in(file, std::ios::binary);
+    in.seekg(startOffset, std::ios::beg);
+    in.read(strBuf, len);
+    in.close();
+    return std::string(strBuf, in.gcount());
 }

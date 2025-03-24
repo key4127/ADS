@@ -66,7 +66,7 @@ bool skiplist::del(uint64_t key)
     }
 
     current = current->nxt[0];
-    if (current == nullptr || current->key != key) {
+    if (current == nullptr || (current != nullptr && current->key != key)) {
         return false;
     } else {
         for (int i = 0; i < curMaxL; i++) {
