@@ -149,23 +149,12 @@ std::string KVStore::get(uint64_t key) //
  * Delete the given key-value pair if it exists.
  * Returns false iff the key is not found.
  */
-bool KVStore::del(uint64_t key) {
-    /*
+bool KVStore::del(uint64_t key) { 
     std::string res = get(key);
     if (!res.length())
         return false; // not exist
     put(key, DEL);    // put a del marker
     return true;
-    */
-
-    std::string res = get(key);
-    bool result = s->del(key);
-    put(key, DEL);
-    if (result && res != "") {
-        return true;
-    } else {
-        return false;
-    }
 }
 
 /**
@@ -298,6 +287,8 @@ void KVStore::compaction() {
     uint64_t lowerBound, upperBound;
     int toMergeTableNums;
 
+    bool lastLevel = false;
+
     for (int level = 0; level <= totalLevel; level++) {
 
         // num to merge
@@ -347,7 +338,6 @@ void KVStore::compaction() {
                 tmp.time = sstableIndex[level + 1][i].getTime();
 
                 if (std::max(sstableIndex[level + 1][i].getMinV(), lowerBound) <= std::min(sstableIndex[level + 1][i].getMaxV(), upperBound)) {
-                //if (sstableIndex[level + 1][i].getMinV() <= upperBound || sstableIndex[level + 1][i].getMaxV() >= lowerBound) {
                     for (int j = 0; j < sstableIndex[level + 1][i].getCnt(); j++) {
                         tmp.pos = j;
                         tmp.index = sstableIndex[level + 1][i].getIndexById(j);
@@ -359,14 +349,13 @@ void KVStore::compaction() {
                 }
             }
         }
-        //printf("prepare\n");
 
         // create new SSTables
         std::sort(toMergePairs.begin(), toMergePairs.end(), cmpPoi());
         for (int i = 0; i < toMergePairs.size(); i++) {
-            /*if (i != 0 && toMergePairs[i].index.key == toMergePairs[i - 1].index.key) {
+            if (i != 0 && toMergePairs[i].index.key == toMergePairs[i - 1].index.key) {
                 continue;
-            }*/
+            }
 
             poi p = toMergePairs[i];
 
@@ -379,6 +368,10 @@ void KVStore::compaction() {
             int goalOffset = offset + 32 + 10240 + 12 * toMergeHeads[p.sstableId].getCnt();
 
             std::string val = fetchString(goalUrl, goalOffset, len);
+
+            if (lastLevel && val == DEL) {
+                continue;
+            }
 
             bool createTable = false;
             if (newTables.empty()) {
@@ -402,6 +395,7 @@ void KVStore::compaction() {
         // save new SSTables
         if (level == totalLevel) {
             totalLevel++;
+            lastLevel = true;
         }
         for (auto table : newTables) {
             addsstable(table, level + 1);
