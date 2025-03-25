@@ -27,8 +27,8 @@ struct poi {
 struct cmpPoi {
     bool operator()(const poi &a, const poi &b) {
         if (a.index.key == b.index.key)
-            return a.time < b.time;
-        return a.index.key > b.index.key;
+            return a.time > b.time;
+        return a.index.key < b.index.key;
     }
 };
 
@@ -292,44 +292,53 @@ void KVStore::compaction() {
 
     std::vector<sstable> newTables;
     std::vector<sstablehead> toMergeHeads;
-    std::list<std::pair<uint64_t, std::string>> list;
+    std::vector<poi> toMergePairs;
+
     int maxSSNum = 2, toMerge = sstableIndex[0].size();
-    uint64_t lowerBound = INF, upperBound = 0;
-    int toMergeTableNums = 0;
-    //printf("compaction preapre\n");
+    uint64_t lowerBound, upperBound;
+    int toMergeTableNums;
 
     for (int level = 0; level <= totalLevel; level++) {
 
         // num to merge
         if (level) {
-            if (sstableIndex[level].size() <= maxSSNum) {
+            toMerge = sstableIndex[level].size() - maxSSNum;
+            if (toMerge <= 0) {
                 break;
-            } else {
-                toMerge = sstableIndex[level].size() - maxSSNum;
             }
+        }
+
+        newTables.clear();
+        toMergeHeads.clear();
+        toMergePairs.clear();
+        lowerBound = INF, upperBound = 0;
+        toMergeTableNums = 0;
+
+        // have to add sth in the next level
+        if (!utils::dirExists(std::string("./data/level-") + std::to_string(level + 1))) {
+            std::string path = std::string("./data/level-") + std::to_string(level + 1);
+            utils::mkdir(path.data());
         }
 
         // find tables to merge in this level
         std::sort(sstableIndex[level].begin(), sstableIndex[level].end());
 
         // save terms to be merged
-        std::vector<poi> toMergePairs;
         for (int i = 0; i < toMerge; i++) {
-            lowerBound = std::min(lowerBound, sstableIndex[level][0].getMinV());
-            upperBound = std::max(upperBound, sstableIndex[level][0].getMaxV());
+            lowerBound = std::min(lowerBound, sstableIndex[level][i].getMinV());
+            upperBound = std::max(upperBound, sstableIndex[level][i].getMaxV());
 
             poi tmp;
-            tmp.sstableId = ++toMergeTableNums;
-            tmp.time = sstableIndex[level][0].getTime();
+            tmp.sstableId = toMergeTableNums++;
+            tmp.time = sstableIndex[level][i].getTime();
 
-            for (int j = 0; j < sstableIndex[level][0].getCnt(); j++) {
+            for (int j = 0; j < sstableIndex[level][i].getCnt(); j++) {
                 tmp.pos = j;
-                tmp.index = sstableIndex[level][0].getIndexById(j);
+                tmp.index = sstableIndex[level][i].getIndexById(j);
                 toMergePairs.push_back(tmp);
             }
 
-            toMergeHeads.push_back(sstableIndex[level][0]);
-            sstableIndex[level].erase(sstableIndex[level].begin());
+            toMergeHeads.push_back(sstableIndex[level][i]);
         }
         if (level != totalLevel) {
             for (int i = 0; i < sstableIndex[level + 1].size(); i++) {
@@ -337,38 +346,58 @@ void KVStore::compaction() {
                 tmp.sstableId = toMergeTableNums;
                 tmp.time = sstableIndex[level + 1][i].getTime();
 
-                if (sstableIndex[level + 1][i].getMinV() <= upperBound || sstableIndex[level + 1][i].getMaxV() >= lowerBound) {
+                if (std::max(sstableIndex[level + 1][i].getMinV(), lowerBound) <= std::min(sstableIndex[level + 1][i].getMaxV(), upperBound)) {
+                //if (sstableIndex[level + 1][i].getMinV() <= upperBound || sstableIndex[level + 1][i].getMaxV() >= lowerBound) {
                     for (int j = 0; j < sstableIndex[level + 1][i].getCnt(); j++) {
                         tmp.pos = j;
-                        tmp.index = sstableIndex[level][i].getIndexById(j);
+                        tmp.index = sstableIndex[level + 1][i].getIndexById(j);
                         toMergePairs.push_back(tmp);
                     }
 
                     toMergeTableNums++;
                     toMergeHeads.push_back(sstableIndex[level + 1][i]);
-                    sstableIndex[level + 1].erase(sstableIndex[level + 1].begin() + i);
-                    i--;
                 }
             }
         }
+        //printf("prepare\n");
 
         // create new SSTables
-        sstable newTable;
         std::sort(toMergePairs.begin(), toMergePairs.end(), cmpPoi());
         for (int i = 0; i < toMergePairs.size(); i++) {
+            /*if (i != 0 && toMergePairs[i].index.key == toMergePairs[i - 1].index.key) {
+                continue;
+            }*/
+
             poi p = toMergePairs[i];
+
             int64_t key = p.index.key;
             uint32_t len;
-            std::string val = fetchString(toMergeHeads[p.sstableId].getFilename(), p.pos, len);
-            int l = p.sstableId < toMerge ? level : level + 1;
 
-            if (newTables.empty() || (!newTables.empty() && newTables.back().checkSize(val, l, false))) {
-                newTable = sstable();
-                newTables.push_back(newTable);
+            std::string goalUrl = toMergeHeads[p.sstableId].getFilename();
+
+            int offset = toMergeHeads[p.sstableId].searchOffset(key, len);
+            int goalOffset = offset + 32 + 10240 + 12 * toMergeHeads[p.sstableId].getCnt();
+
+            std::string val = fetchString(goalUrl, goalOffset, len);
+
+            bool createTable = false;
+            if (newTables.empty()) {
+                createTable = true;
+            } else {
+                if (newTables.back().checkSize(val, level + 1, false)) {
+                    createTable = true;
+                }
             }
-
-            newTable.insert(key, val);
+            
+            if (createTable) {
+                newTables.push_back(sstable(s));
+            }
+ 
+            newTables.back().insert(key, val);
         }
+
+        // put file
+        newTables.back().checkSize("", level + 1, true);
 
         // save new SSTables
         if (level == totalLevel) {
@@ -377,11 +406,14 @@ void KVStore::compaction() {
         for (auto table : newTables) {
             addsstable(table, level + 1);
         }
-        newTables.back().putFile(newTables.back().getFilename().data());
+
+        // delete old SSTables
+        for (auto head : toMergeHeads) {
+            this->delsstable(head.getFilename());
+        }
 
         maxSSNum *= 2;
     }
-    //printf("a compaction ends\n");
 }
 
 void KVStore::delsstable(std::string filename) {
