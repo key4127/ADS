@@ -1,0 +1,3 @@
+[submodule "lsm-tree-phase2/third_party/llama.cpp"]
+	path = lsm-tree-phase2/third_party/llama.cpp
+	url = https://gitee.com/ShadowNearby/llama.cpp.git

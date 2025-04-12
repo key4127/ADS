@@ -9,6 +9,9 @@
 #include <cstdint>
 #include <vector>
 #include <limits>
+
+#include "embedding.h"
+
 static uint64_t TIME = 0;                     // 全局时间戳
 const uint64_t INF   = std::numeric_limits<uint64_t>::max();
 
@@ -49,6 +52,7 @@ public:
         cnt         = 0;
         minV        = INF;
         maxV        = 0;
+
         slnode *cur = s->getFirst();
         while (cur->type != TAIL) { // curpos 为这个串的终止地址
             cnt++;
@@ -57,6 +61,7 @@ public:
             maxV = std::max(maxV, cur->key);
             filter.insert(cur->key);
             index.emplace_back(cur->key, curpos);
+            index.back().vec = cur->vec;
             data.push_back(cur->val);
             cur = cur->nxt[0];
         }

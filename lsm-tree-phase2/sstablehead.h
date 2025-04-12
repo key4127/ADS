@@ -11,6 +11,7 @@
 struct Index {
     uint64_t key;
     uint32_t offset;
+    std::vector<float> vec;
 
     Index() {}
 

@@ -14,7 +14,7 @@ int skiplist::randLevel()
     return level;
 }
 
-void skiplist::insert(uint64_t key, const std::string &str)
+void skiplist::insert(uint64_t key, const std::string &str, std::vector<float> vec)
 {
     std::vector<slnode*> update(MAX_LEVEL, head);
     slnode *current = head;
@@ -31,9 +31,11 @@ void skiplist::insert(uint64_t key, const std::string &str)
         // modify value
         this->bytes += (str.length() - current->val.length());
         current->val = str;
+        current->vec = vec;
     } else {
         // add new key and value
         slnode *node = new slnode(key, str, NORMAL);
+        node->vec = vec;
         int newLevel = randLevel();
         for (int level = 0; level < newLevel; level++) {
             node->nxt[level] = update[level]->nxt[level];
@@ -136,4 +138,26 @@ void skiplist::reset()
 uint32_t skiplist::getBytes()
 {
     return this->bytes;
+}
+
+std::vector<std::vector<float>> skiplist::getVec()
+{
+    std::vector<std::vector<float>> vec;
+    slnode *cur = this->getFirst();
+    while (cur->type != TAIL) {
+        vec.push_back(cur->vec);
+        cur = cur->nxt[0];
+    }
+    return vec;
+}
+
+std::vector<uint64_t> skiplist::getKey()
+{
+    std::vector<uint64_t> vec;
+    slnode *cur = this->getFirst();
+    while (cur->type != TAIL) {
+        vec.push_back(cur->key);
+        cur = cur->nxt[0];
+    }
+    return vec;
 }

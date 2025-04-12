@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "embedding.h"
+
 enum TYPE {
     HEAD,
     NORMAL,
@@ -21,6 +23,8 @@ public:
     std::string val;
     TYPE type;
     std::vector<slnode *> nxt;
+
+    std::vector<float> vec;
 
     slnode(uint64_t key, const std::string &val, TYPE type) {
         this->key  = key;
@@ -57,13 +61,16 @@ public:
 
     double my_rand();
     int randLevel();
-    void insert(uint64_t key, const std::string &str);
+    void insert(uint64_t key, const std::string &str, std::vector<float> vec);
     std::string search(uint64_t key);
     bool del(uint64_t key);
     void scan(uint64_t key1, uint64_t key2, std::vector<std::pair<uint64_t, std::string>> &list);
     slnode *lowerBound(uint64_t key);
     void reset();
     uint32_t getBytes();
+
+    std::vector<std::vector<float>> getVec();
+    std::vector<uint64_t> getKey();
 };
 
 #endif // LSM_KV_SKIPLIST_H

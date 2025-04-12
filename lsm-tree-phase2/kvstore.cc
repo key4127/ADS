@@ -14,6 +14,8 @@
 
 #include <fstream>
 
+#include "embedding.h"
+
 static const std::string DEL = "~DELETED~";
 const uint32_t MAXSIZE       = 2 * 1024 * 1024;
 
@@ -78,8 +80,9 @@ void KVStore::put(uint64_t key, const std::string &val) {
         nxtsize += 12 + val.length();
     } else
         nxtsize = nxtsize - res.length() + val.length(); // change string
+    std::vector<std::vector<float>> vec = embedding(val);
     if (nxtsize + 10240 + 32 <= MAXSIZE)
-        s->insert(key, val); // 小于等于（不超过） 2MB
+        s->insert(key, val, vec[0]); // 小于等于（不超过） 2MB
     else {
         sstable ss(s);
         s->reset();
@@ -92,7 +95,7 @@ void KVStore::put(uint64_t key, const std::string &val) {
         addsstable(ss, 0);      // 加入缓存
         ss.putFile(url.data()); // 加入磁盘
         compaction();
-        s->insert(key, val);
+        s->insert(key, val, vec[0]);
     }
 }
 
@@ -454,4 +457,55 @@ std::string KVStore::fetchString(std::string file, int startOffset, uint32_t len
     in.read(strBuf, len);
     in.close();
     return std::string(strBuf, in.gcount());
+}
+
+bool simCmp(std::pair<std::uint64_t, float>x, std::pair<std::uint64_t, float> y) {
+    if (x.second == y.second) {
+        return x.first < y.first;
+    }
+    return x.second > y.second;
+}
+
+std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::string query, int k)
+{
+    std::vector<std::pair<std::uint64_t, std::string>> ans;
+    std::vector<std::pair<std::uint64_t, float>> sim;
+
+    // initialize
+    for (int i = 0; i < k; i++) {
+        ans.push_back(std::make_pair(-1, ""));
+    }
+
+    std::vector<float> queryVec = embedding(query)[0];
+
+    // cal skiplist
+    std::vector<std::vector<float>> skiplistVec = s->getVec();
+    std::vector<uint64_t> skiplistKey = s->getKey();
+    int n = skiplistVec[0].size();
+    for (int i = 0; i < skiplistVec.size(); i++) {
+        sim.push_back(std::make_pair(
+                        skiplistKey[i], 
+                        common_embd_similarity_cos(skiplistVec[i].data(), queryVec.data(), n)
+                    ));
+    }
+
+    for (int i = 0; i <= totalLevel; i++) {
+        for (int j = 0; j < sstableIndex[i].size(); j++) {
+            for (int p = 0; p < sstableIndex[i][j].getCnt(); p++) {
+                Index index = sstableIndex[i][j].getIndexById(p);
+                sim.push_back(std::make_pair(
+                    index.key,
+                    common_embd_similarity_cos(index.vec.data(), queryVec.data(), n)
+                ));
+            }
+        }
+    }
+
+    sort(sim.begin(), sim.end(), simCmp);
+
+    for (int i = 0; i < k; i++) {
+        ans[i] = std::make_pair(sim[i].first, this->get(sim[i].first));
+    }
+
+    return ans;
 }

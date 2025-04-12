@@ -36,5 +36,5 @@ bench
 correctness
 
 model
-.gitmodules
-third_party/
+#.gitmodules
+#third_party/
