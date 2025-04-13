@@ -33,3 +33,12 @@ add_subdirectory(test)
 target_link_libraries(correctness PRIVATE embedding)
 target_link_libraries(persistence PRIVATE embedding)
 target_link_libraries(E2E_test PRIVATE embedding)
+
+# for report
+
+add_executable(report report.cpp kvstore_api.h kvstore.h kvstore.cc
+        skiplist.cpp skiplist.h sstable.cpp sstable.h
+        bloom.cpp bloom.h MurmurHash3.h utils.h test.h
+        sstablehead.cpp sstablehead.h)
+
+target_link_libraries(report PRIVATE embedding)

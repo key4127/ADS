@@ -1,4 +1,5 @@
 #include "embedding.h"
+#include <iostream>
 
 #if defined(_MSC_VER)
 #pragma warning(disable : 4244 4267)  // possible loss of data
@@ -10,6 +11,10 @@ const int CONTEXT_SIZE = 2048;
 const int BATCH_SIZE = 2048;
 const int ROPE_SCALING_YARN = 1;
 const float ROPE_FREQ_SCALE = 0.75;
+
+static std::chrono::milliseconds tokenize_duration = std::chrono::milliseconds(0),
+                                 initialize_duration = std::chrono::milliseconds(0), 
+                                 batch_duration = std::chrono::milliseconds(0);
 
 std::string join(const std::vector<std::string>& vec,
                  const std::string& delimiter) {
@@ -157,6 +162,7 @@ int embedding_utils(const std::string& prompt, std::vector<float>& embeddings,
         __func__, n_ctx_train, n_ctx);
   }
 
+  auto tokenize_start = std::chrono::high_resolution_clock::now();
   // split the prompt into lines
   std::vector<std::string> prompts = split_lines(prompt, params.embd_sep);
 
@@ -177,6 +183,7 @@ int embedding_utils(const std::string& prompt, std::vector<float>& embeddings,
     }
     inputs.push_back(inp);
   }
+  auto tokenize_end = std::chrono::high_resolution_clock::now();
 
   // check if the last token is SEP
   // it should be automatically added by the tokenizer when
@@ -191,6 +198,7 @@ int embedding_utils(const std::string& prompt, std::vector<float>& embeddings,
     }
   }
 
+  auto initialize_start = std::chrono::high_resolution_clock::now();
   // initialize batch
   n_prompts = prompts.size();
   struct llama_batch batch = llama_batch_init(n_batch, 0, 1);
@@ -204,12 +212,14 @@ int embedding_utils(const std::string& prompt, std::vector<float>& embeddings,
   } else {
     n_embd_count = n_prompts;
   }
+  auto initialize_end = std::chrono::high_resolution_clock::now();
 
   // allocate output
   n_embd = llama_model_n_embd(model);
   embeddings.resize(n_embd_count * n_embd, 0);
   float* emb = embeddings.data();
 
+  auto batch_start = std::chrono::high_resolution_clock::now();
   // break into batches
   int e = 0;  // number of embeddings already stored
   int s = 0;  // number of prompts in current batch
@@ -237,10 +247,19 @@ int embedding_utils(const std::string& prompt, std::vector<float>& embeddings,
   float* out = emb + e * n_embd;
   batch_decode(ctx, batch, out, s, n_embd, params.embd_normalize);
   llama_perf_context_print(ctx);
+  auto batch_end = std::chrono::high_resolution_clock::now();
 
   // clean up
   llama_batch_free(batch);
   llama_backend_free();
+
+  tokenize_duration += std::chrono::duration_cast<std::chrono::milliseconds>(tokenize_end - tokenize_start);
+  initialize_duration += std::chrono::duration_cast<std::chrono::milliseconds>(initialize_end - initialize_start);
+  batch_duration += std::chrono::duration_cast<std::chrono::milliseconds>(batch_end - batch_start);
+
+  std::cout << "Tokenize elapsed time: " << tokenize_duration.count() << " milliseconds" << std::endl;
+  std::cout << "Intialize elapsed time: " << initialize_duration.count() << " milliseconds" << std::endl;
+  std::cout << "Batch elapsed time: " << batch_duration.count() << " milliseconds" << std::endl;
 
   return 0;
 }

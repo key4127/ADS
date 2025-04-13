@@ -104,6 +104,8 @@ private:
 			nr_passed_tests = 0;
 		};
 		phase_with_tolerance(0.15);
+
+        store.output();
 	}
 
 public:

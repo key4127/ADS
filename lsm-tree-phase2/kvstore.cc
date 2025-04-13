@@ -16,6 +16,8 @@
 
 #include "embedding.h"
 
+#include <chrono>
+
 static const std::string DEL = "~DELETED~";
 const uint32_t MAXSIZE       = 2 * 1024 * 1024;
 
@@ -53,6 +55,11 @@ KVStore::KVStore(const std::string &dir) :
             TIME = std::max(TIME, cur.getTime()); // 更新时间戳
         }
     }
+
+    query_duration = std::chrono::milliseconds(0);
+    fetch_duration = std::chrono::milliseconds(0);
+    cal_duration = std::chrono::milliseconds(0);
+    sort_duration = std::chrono::milliseconds(0);
 }
 
 KVStore::~KVStore()
@@ -476,32 +483,48 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
         ans.push_back(std::make_pair(-1, ""));
     }
 
+    auto query_start = std::chrono::high_resolution_clock::now();
     std::vector<float> queryVec = embedding(query)[0];
+    auto query_end = std::chrono::high_resolution_clock::now();
 
     // cal skiplist
+    auto fetch_start = std::chrono::high_resolution_clock::now();
     std::vector<std::vector<float>> skiplistVec = s->getVec();
     std::vector<uint64_t> skiplistKey = s->getKey();
     int n = skiplistVec[0].size();
+    std::vector<Index> index;
+    for (int i = 0; i <= totalLevel; i++) {
+        for (int j = 0; j < sstableIndex[i].size(); j++) {
+            for (int p = 0; p < sstableIndex[i][j].getCnt(); p++) {
+                index.push_back(sstableIndex[i][j].getIndexById(p));
+            }
+        }
+    }
+    auto fetch_end = std::chrono::high_resolution_clock::now();
+
+    auto cal_start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < skiplistVec.size(); i++) {
         sim.push_back(std::make_pair(
                         skiplistKey[i], 
                         common_embd_similarity_cos(skiplistVec[i].data(), queryVec.data(), n)
                     ));
     }
-
-    for (int i = 0; i <= totalLevel; i++) {
-        for (int j = 0; j < sstableIndex[i].size(); j++) {
-            for (int p = 0; p < sstableIndex[i][j].getCnt(); p++) {
-                Index index = sstableIndex[i][j].getIndexById(p);
-                sim.push_back(std::make_pair(
-                    index.key,
-                    common_embd_similarity_cos(index.vec.data(), queryVec.data(), n)
-                ));
-            }
-        }
+    for (int i = 0; i < index.size(); i++) {
+        sim.push_back(std::make_pair(
+            index[i].key, 
+            common_embd_similarity_cos(index[i].vec.data(), queryVec.data(), n)
+        ));
     }
+    auto cal_end = std::chrono::high_resolution_clock::now();
 
+    auto sort_start = std::chrono::high_resolution_clock::now();
     sort(sim.begin(), sim.end(), simCmp);
+    auto sort_end = std::chrono::high_resolution_clock::now();
+
+    query_duration += std::chrono::duration_cast<std::chrono::milliseconds>(query_end - query_start);
+    fetch_duration += std::chrono::duration_cast<std::chrono::milliseconds>(fetch_end - fetch_start);
+    cal_duration += std::chrono::duration_cast<std::chrono::milliseconds>(cal_end - cal_start);
+    sort_duration += std::chrono::duration_cast<std::chrono::milliseconds>(sort_end - sort_start);
 
     for (int i = 0; i < k; i++) {
         ans[i] = std::make_pair(sim[i].first, this->get(sim[i].first));

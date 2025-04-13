@@ -5,6 +5,7 @@
 #include <numeric>
 #include <string>
 #include <vector>
+#include <chrono>
 
 #include "common.h"
 #include "llama.h"

@@ -4,6 +4,8 @@
 #include "skiplist.h"
 #include "sstable.h"
 #include "sstablehead.h"
+#include <chrono>
+#include <iostream>
 
 #include <map>
 #include <set>
@@ -17,6 +19,8 @@ private:
     std::vector<sstablehead> sstableIndex[15]; // the sshead for each level
 
     int totalLevel = -1; // 层数
+
+    std::chrono::milliseconds query_duration, fetch_duration, cal_duration, sort_duration;
 public:
     KVStore(const std::string &dir);
 
@@ -40,4 +44,12 @@ public:
     std::string fetchString(std::string file, int startOffset, uint32_t len);
 
     std::vector<std::pair<std::uint64_t, std::string>> search_knn(std::string query, int k);
+
+    void output()
+    {
+        std::cout << "Query elapsed time: " << query_duration.count() << " milliseconds" << std::endl;
+        std::cout << "Fetch elapsed time: " << fetch_duration.count() << " milliseconds" << std::endl;
+        std::cout << "Cal elapsed time: " << cal_duration.count() << " milliseconds" << std::endl;
+        std::cout << "Sort elapsed time: " << sort_duration.count() << " milliseconds" << std::endl;
+    }
 };
