@@ -45,6 +45,9 @@ private:
     slnode *head   = new slnode(0, "", HEAD);
     slnode *tail   = new slnode(INF, "", TAIL);
 
+    // for knn insert test
+    std::chrono::microseconds duration = std::chrono::microseconds(0);
+
 public:
     skiplist(double p) { // p 表示增长概率
         s       = 1;
@@ -71,6 +74,10 @@ public:
 
     std::vector<std::vector<float>> getVec();
     std::vector<uint64_t> getKey();
+
+    std::chrono::microseconds getDuration() {
+        return duration;
+    }
 };
 
 #endif // LSM_KV_SKIPLIST_H

@@ -31,11 +31,21 @@ void skiplist::insert(uint64_t key, const std::string &str, std::vector<float> v
         // modify value
         this->bytes += (str.length() - current->val.length());
         current->val = str;
+
+        auto start = std::chrono::high_resolution_clock::now();
         current->vec = vec;
+        auto end = std::chrono::high_resolution_clock::now();
+        this->duration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
     } else {
         // add new key and value
         slnode *node = new slnode(key, str, NORMAL);
+
+        auto start = std::chrono::high_resolution_clock::now();
         node->vec = vec;
+        auto end = std::chrono::high_resolution_clock::now();
+        this->duration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        
         int newLevel = randLevel();
         for (int level = 0; level < newLevel; level++) {
             node->nxt[level] = update[level]->nxt[level];

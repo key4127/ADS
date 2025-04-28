@@ -55,11 +55,6 @@ KVStore::KVStore(const std::string &dir) :
             TIME = std::max(TIME, cur.getTime()); // 更新时间戳
         }
     }
-
-    query_duration = std::chrono::milliseconds(0);
-    fetch_duration = std::chrono::milliseconds(0);
-    cal_duration = std::chrono::milliseconds(0);
-    sort_duration = std::chrono::milliseconds(0);
 }
 
 KVStore::~KVStore()
@@ -104,6 +99,10 @@ void KVStore::put(uint64_t key, const std::string &val) {
         compaction();
         s->insert(key, val, vec[0]);
     }
+    auto start = std::chrono::high_resolution_clock::now();
+    h->insert(key, vec[0]);
+    auto end = std::chrono::high_resolution_clock::now();
+    this->hnswInsertDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 }
 
 /**
@@ -475,6 +474,8 @@ bool simCmp(std::pair<std::uint64_t, float>x, std::pair<std::uint64_t, float> y)
 
 std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::string query, int k)
 {
+    auto start = std::chrono::high_resolution_clock::now();
+
     std::vector<std::pair<std::uint64_t, std::string>> ans;
     std::vector<std::pair<std::uint64_t, float>> sim;
 
@@ -483,12 +484,9 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
         ans.push_back(std::make_pair(-1, ""));
     }
 
-    auto query_start = std::chrono::high_resolution_clock::now();
     std::vector<float> queryVec = embedding(query)[0];
-    auto query_end = std::chrono::high_resolution_clock::now();
 
     // cal skiplist
-    auto fetch_start = std::chrono::high_resolution_clock::now();
     std::vector<std::vector<float>> skiplistVec = s->getVec();
     std::vector<uint64_t> skiplistKey = s->getKey();
     int n = skiplistVec[0].size();
@@ -500,9 +498,7 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
             }
         }
     }
-    auto fetch_end = std::chrono::high_resolution_clock::now();
 
-    auto cal_start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < skiplistVec.size(); i++) {
         sim.push_back(std::make_pair(
                         skiplistKey[i], 
@@ -515,20 +511,55 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
             common_embd_similarity_cos(index[i].vec.data(), queryVec.data(), n)
         ));
     }
-    auto cal_end = std::chrono::high_resolution_clock::now();
 
-    auto sort_start = std::chrono::high_resolution_clock::now();
     sort(sim.begin(), sim.end(), simCmp);
-    auto sort_end = std::chrono::high_resolution_clock::now();
-
-    query_duration += std::chrono::duration_cast<std::chrono::milliseconds>(query_end - query_start);
-    fetch_duration += std::chrono::duration_cast<std::chrono::milliseconds>(fetch_end - fetch_start);
-    cal_duration += std::chrono::duration_cast<std::chrono::milliseconds>(cal_end - cal_start);
-    sort_duration += std::chrono::duration_cast<std::chrono::milliseconds>(sort_end - sort_start);
 
     for (int i = 0; i < k; i++) {
         ans[i] = std::make_pair(sim[i].first, this->get(sim[i].first));
     }
 
+    auto end = std::chrono::high_resolution_clock::now();
+
+    this->knnQueryDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
     return ans;
+}
+
+std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn_hnsw(std::string query, int k)
+{
+    std::vector<float> vec =  embedding(query)[0];
+
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    std::vector<uint64_t> key = h->query(vec, k);
+
+    std::vector<std::pair<std::uint64_t, std::string>> ans;
+
+    for (int i = 0; i < k; i++) {
+        std::string val = this->get(key[i]);
+        ans.push_back(std::make_pair(key[i], val));
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+
+    this->hnswQueryDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    return ans;
+}
+
+void KVStore::output()
+{
+    //this->knnInsertDuration = s->getDuration();
+
+    /*printf("knn: \n");
+    std::cout << "insert time: " << knnInsertDuration.count() << "ms\n";
+    std::cout << " query time: " << knnQueryDuration.count() << "ms\n";
+    printf("\n");*/
+
+    /*printf("hnsw: \n");
+    std::cout << "insert time: " << hnswInsertDuration.count() << "ms\n";
+    std::cout << " query time: " << hnswQueryDuration.count() << "ms\n";
+    printf("\n");*/
+
+    std::cout << "time: " << hnswInsertDuration.count() + hnswQueryDuration.count() << "ms\n\n";
 }

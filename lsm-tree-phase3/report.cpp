@@ -47,6 +47,8 @@ void embedding_output()
 int main()
 {
     auto trimmed_text = read_file("./data/trimmed_text.txt");
+    auto test_text = read_file("./data/test_text.txt");
+    auto ans = read_file("./data/test_text_ans.txt");
     class KVStore store("./data");
     store.reset();
 
@@ -55,13 +57,28 @@ int main()
     for (int i = 0; i < max; i++) {
         store.put(i, trimmed_text[i]);
     }
-    /*
-    auto test_text = read_file("./data/test_text.txt");
-    std::cout << test_text.size();
-    for (int i = 0; i < max; i++) {
-        store.search_knn(test_text[i], 3);
-    }*/
 
-    //store.output();
-    //embedding_output();
+    int k = 3;
+    int knn_idx = 0, hnsw_idx = 0;
+    int idx = 0;
+
+    for (int i = 0; i < max; i++) {
+        auto knn_res = store.search_knn(test_text[i], k);
+        auto hnsw_res = store.search_knn_hnsw(test_text[i], k);
+
+        for (int j = 0; j < k; j++) {
+            /*if (knn_res[j].second == ans[idx]) {
+                knn_idx++;
+            }*/
+            if (hnsw_res[j].second == ans[idx]) {
+                hnsw_idx++;
+            }
+            idx++;
+        }
+    }
+
+    printf("\n");
+    printf("rate: %d/%d, %.3lf\n", hnsw_idx, 360, static_cast<double>(hnsw_idx) / 360);
+
+    store.output();
 }

@@ -37,4 +37,4 @@ correctness
 
 model
 #.gitmodules
-#third_party/
+third_party/
