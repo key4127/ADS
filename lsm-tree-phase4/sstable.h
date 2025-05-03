@@ -61,7 +61,6 @@ public:
             maxV = std::max(maxV, cur->key);
             filter.insert(cur->key);
             index.emplace_back(cur->key, curpos);
-            index.back().vec = cur->vec;
             data.push_back(cur->val);
             cur = cur->nxt[0];
         }

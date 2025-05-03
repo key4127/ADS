@@ -5,6 +5,7 @@
 #include "HNSW.h"
 #include "sstable.h"
 #include "sstablehead.h"
+#include "emtable.h"
 #include <chrono>
 #include <iostream>
 
@@ -18,6 +19,7 @@ private:
     // std::vector<sstablehead> sstableIndex;  // sstable的表头缓存
 
     std::vector<sstablehead> sstableIndex[15]; // the sshead for each level
+    emtable e;
 
     int totalLevel = -1; // 层数
 
@@ -27,6 +29,8 @@ private:
     std::chrono::microseconds knnQueryDuration = std::chrono::microseconds(0);
     std::chrono::microseconds hnswInsertDuration = std::chrono::microseconds(0);
     std::chrono::microseconds hnswQueryDuration = std::chrono::microseconds(0);
+
+    static const uint64_t dimension = 768;
 
 public:
     KVStore(const std::string &dir);
@@ -53,6 +57,8 @@ public:
     std::vector<std::pair<std::uint64_t, std::string>> search_knn(std::string query, int k);
 
     std::vector<std::pair<std::uint64_t, std::string>> search_knn_hnsw(std::string query, int k);
+
+    void load_embedding_to_disk(std::string path);
 
     // for test
     void output();

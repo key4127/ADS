@@ -86,19 +86,11 @@ void sstable::loadFile(const char *path) { // load file from the path
     buf[index[0].offset] = '\0';
     cur                  = buf;
     data.push_back(cur);
-    std::vector<std::string> words;
-    words.push_back(cur);
     for (int i = 1; i < cnt; ++i) {
         fread(buf, 1, index[i].offset - index[i - 1].offset, file);
         buf[index[i].offset - index[i - 1].offset] = '\0';
         cur                                        = buf;
         data.push_back(cur);
-        words.push_back(cur);
-    }
-    std::string joined = join(words, "\n");
-    std::vector<std::vector<float>> vec = embedding(joined);
-    for (int i = 0; i < cnt; i++) {
-        index[i].vec = vec[i];
     }
     fflush(file);
     fclose(file);

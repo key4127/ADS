@@ -3,6 +3,7 @@
 HNSW::HNSW()
 {
     this->totalLevel = -1;
+    this->dimension = 768;
     
     m_M = 8;
     m_L = 6;

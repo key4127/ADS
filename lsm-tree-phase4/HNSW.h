@@ -54,6 +54,7 @@ struct HNworst {
 
 class HNSW {
 private:
+    int dimension;
     int totalLevel;
     std::vector<HWnode *> head;
 

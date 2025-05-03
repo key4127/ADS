@@ -11,7 +11,6 @@
 struct Index {
     uint64_t key;
     uint32_t offset;
-    std::vector<float> vec;
 
     Index() {}
 
@@ -134,7 +133,6 @@ public:
 
     int search(uint64_t key);
     int lowerBound(uint64_t key); /*返回大于等于的第一个的下标 没有返回len + 1*/
-    void showIndexs();
 };
 
 #endif // LSM_KV_SSTABLEHEAD_H

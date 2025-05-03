@@ -55,6 +55,10 @@ KVStore::KVStore(const std::string &dir) :
             TIME = std::max(TIME, cur.getTime()); // 更新时间戳
         }
     }
+
+    // e
+    std::string hPath = "embedding_data/";
+    e.loadFile(hPath.data());
 }
 
 KVStore::~KVStore()
@@ -63,11 +67,13 @@ KVStore::~KVStore()
     if (!ss.getCnt())
         return; // empty sstable
     std::string path = std::string("./data/level-0/");
+    std::string hPath = std::string("embedding_data/");
     if (!utils::dirExists(path)) {
         utils::_mkdir(path.data());
         totalLevel = 0;
     }
     ss.putFile(ss.getFilename().data());
+    e.putFile(hPath.data());
     compaction(); // 从0层开始尝试合并
 }
 
@@ -90,6 +96,7 @@ void KVStore::put(uint64_t key, const std::string &val) {
         s->reset();
         std::string url  = ss.getFilename();
         std::string path = "./data/level-0";
+        std::string hPath = "embedding_data/";
         if (!utils::dirExists(path)) {
             utils::mkdir(path.data());
             totalLevel = 0;
@@ -99,10 +106,9 @@ void KVStore::put(uint64_t key, const std::string &val) {
         compaction();
         s->insert(key, val, vec[0]);
     }
-    auto start = std::chrono::high_resolution_clock::now();
+
     h->insert(key, vec[0]);
-    auto end = std::chrono::high_resolution_clock::now();
-    this->hnswInsertDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    e.put(key, vec[0]);
 }
 
 /**
@@ -153,7 +159,7 @@ std::string KVStore::get(uint64_t key) //
         return "";
     return res;
 }
-#include<iostream>
+
 /**
  * Delete the given key-value pair if it exists.
  * Returns false iff the key is not found.
@@ -184,6 +190,7 @@ void KVStore::reset() {
         sstableIndex[level].clear();
     }
     totalLevel = -1;
+    e.reset();
 }
 
 /**
@@ -486,30 +493,18 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
 
     std::vector<float> queryVec = embedding(query)[0];
 
-    // cal skiplist
-    std::vector<std::vector<float>> skiplistVec = s->getVec();
-    std::vector<uint64_t> skiplistKey = s->getKey();
-    int n = skiplistVec[0].size();
-    std::vector<Index> index;
-    for (int i = 0; i <= totalLevel; i++) {
-        for (int j = 0; j < sstableIndex[i].size(); j++) {
-            for (int p = 0; p < sstableIndex[i][j].getCnt(); p++) {
-                index.push_back(sstableIndex[i][j].getIndexById(p));
-            }
-        }
-    }
+    std::unordered_set<uint64_t> key;
+    std::vector<DataBlock> data = e.getDataBlock();
+    int n = e.getDimention();
 
-    for (int i = 0; i < skiplistVec.size(); i++) {
-        sim.push_back(std::make_pair(
-                        skiplistKey[i], 
-                        common_embd_similarity_cos(skiplistVec[i].data(), queryVec.data(), n)
-                    ));
-    }
-    for (int i = 0; i < index.size(); i++) {
-        sim.push_back(std::make_pair(
-            index[i].key, 
-            common_embd_similarity_cos(index[i].vec.data(), queryVec.data(), n)
-        ));
+    for (int i = data.size() - 1; i >= 0; i--) {
+        if (key.find(data[i].key) == key.end()) {
+            key.insert(data[i].key);
+            sim.push_back(std::make_pair(
+                data[i].key,
+                common_embd_similarity_cos(data[i].vec.data(), queryVec.data(), n)
+            ));
+        }
     }
 
     sort(sim.begin(), sim.end(), simCmp);
@@ -562,4 +557,9 @@ void KVStore::output()
     printf("\n");*/
 
     std::cout << "time: " << hnswInsertDuration.count() + hnswQueryDuration.count() << "ms\n\n";
+}
+
+void KVStore::load_embedding_to_disk(std::string path)
+{
+    e.loadFile(path.data());
 }
