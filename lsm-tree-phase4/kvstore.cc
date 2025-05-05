@@ -569,3 +569,8 @@ void KVStore::load_embedding_from_disk(std::string path)
 {
     e.loadFile(path.data());
 }
+
+void KVStore::save_hnsw_index_to_disk(const std::string &hnsw_data_root)
+{
+    h->loadFile(hnsw_data_root);
+}

@@ -25,7 +25,7 @@ void emtable::putFile(const char *path)
     this->pathDir = path;
 
     FILE *file = fopen(path, "wb");
-    fseek(file, 0, SEEK_END);
+    fseek(file, 0, SEEK_SET);
     fwrite(&this->dimension, 8, 1, file);
 
     int size = this->dataBlock.size();

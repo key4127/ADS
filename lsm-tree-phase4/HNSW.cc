@@ -209,3 +209,22 @@ bool HNSW::isDeleted(uint64_t key, std::vector<float> vec)
 
     return false;
 }
+
+void HNSW::putFile(const std::string &pathDir)
+{
+    const char *path = pathDir.data();
+
+    if (!utils::dirExists(path)) {
+        utils::mkdir(path);
+    }
+
+    FILE *file;
+
+    file = fopen(path, "wb");
+    fseek(file, 0, SEEK_END);
+}
+
+void HNSW::loadFile(const std::string &pathDir)
+{
+    
+}

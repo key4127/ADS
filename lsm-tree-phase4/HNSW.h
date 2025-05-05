@@ -13,6 +13,7 @@
 #include <iostream>
 
 #include "embedding.h"
+#include "utils.h"
 
 static int m_M;
 static int m_L;
@@ -71,6 +72,9 @@ public:
     void insert(uint64_t key, std::vector<float> vec);
     void del(uint64_t key, std::vector<float> vec);
     std::vector<uint64_t> query(std::vector<float> vec, int k);
+
+    void putFile(const std::string &path);
+    void loadFile(const std::string &path);
 };
 
 #endif
