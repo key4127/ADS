@@ -80,7 +80,7 @@ void emtable::loadFile(const char *path) // to empty datablock
 
     std::unordered_set<uint64_t> key;
     for (int i = originData.size() - 1; i >= 0; i--) {
-        if (key.find(originData[i].key) == key.end()) {
+        if (key.find(originData[i].key) == key.end() && (!isVecDelete(originData[i].vec))) {
             key.insert(originData[i].key);
             this->dataBlock.push_back(originData[i]);
         }
@@ -118,7 +118,33 @@ void emtable::del(uint64_t key)
     dataBlock.push_back(block);
 }
 
+std::vector<float> emtable::get(uint64_t key)
+{
+    for (int i = dataBlock.size() - 1; i >= 0; i--) {
+        if (dataBlock[i].key == key) {
+            return dataBlock[i].vec;
+        }
+    }
+
+    std::vector<float> maxVec;
+    for (int i = 0; i < dimension; i++) {
+        maxVec.push_back(std::numeric_limits<float>::max());
+    }
+    return maxVec;
+}
+
 std::vector<DataBlock> emtable::getDataBlock()
 {
     return dataBlock;
+}
+
+bool emtable::isVecDelete(std::vector<float> vec)
+{
+    for (int i = 0; i < vec.size(); i++) {
+        if (vec[i] != std::numeric_limits<float>::max()) {
+            return false;
+        }
+    }
+
+    return true;
 }

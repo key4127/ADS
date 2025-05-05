@@ -57,15 +57,19 @@ private:
     int dimension;
     int totalLevel;
     std::vector<HWnode *> head;
+    std::vector<std::vector<float>> deletedNodes;
+    std::unordered_set<float> deletedKeys;
 
     int randLevel();
     std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, float>>, HNbest> searchLayer(
         std::vector<float> vec, HWnode* entry, int layer, int num);
+    bool isDeleted(uint64_t, std::vector<float> vec);
 
 public:
     HNSW();
 
     void insert(uint64_t key, std::vector<float> vec);
+    void del(uint64_t key, std::vector<float> vec);
     std::vector<uint64_t> query(std::vector<float> vec, int k);
 };
 

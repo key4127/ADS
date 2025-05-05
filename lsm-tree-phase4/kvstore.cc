@@ -107,8 +107,14 @@ void KVStore::put(uint64_t key, const std::string &val) {
         s->insert(key, val, vec[0]);
     }
 
-    h->insert(key, vec[0]);
-    e.put(key, vec[0]);
+    if (val != DEL) {
+        h->insert(key, vec[0]);
+        e.put(key, vec[0]);
+    } else {
+        std::vector<float> origin = e.get(key);
+        h->del(key, origin);
+        e.del(key);
+    }
 }
 
 /**
@@ -559,7 +565,7 @@ void KVStore::output()
     std::cout << "time: " << hnswInsertDuration.count() + hnswQueryDuration.count() << "ms\n\n";
 }
 
-void KVStore::load_embedding_to_disk(std::string path)
+void KVStore::load_embedding_from_disk(std::string path)
 {
     e.loadFile(path.data());
 }

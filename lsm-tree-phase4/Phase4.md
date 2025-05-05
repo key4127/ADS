@@ -111,6 +111,7 @@ std::vector<std::vector<float>> deleted_nodes;
 ```
 /hnsw_data_root/
   ├── global_header.bin   # 全局参数文件（同原HNSWHeader结构）
+  ├── deleted_nodes.bin   # 被删除的节点数据
   ├── nodes/              # 节点数据存储目录
   │   ├── 0/              # 节点0的数据
   │   │   ├── header.bin  # 向量数据（float32数组）
@@ -134,6 +135,23 @@ struct HNSWGlobalHeader {
     uint32_t num_nodes;        // 节点总数
     uint32_t dim;              // 向量维度
 };
+```
+
+#### deleted_nodes.bin
+
+```c++
+std::vector<std::vector<float>> deleted_nodes;
+```
+
+以 `dim=768`为例，文件布局示意图如下：
+
+```
++------------------+------------------+-----+------------------+------------------+
+|                  |                  |     |                  |                  |
+| float[768]       | float[768]       |     | float[768]       | float[768]       |
+| (vector data)    |   (vector data)  | ... |   (vector data)  | (vector data)    |
+|                  |                  |     |                  |                  |
++------------------+------------------+-----+------------------+------------------+
 ```
 
 #### 单个节点结构

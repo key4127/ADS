@@ -11,6 +11,7 @@
 
 #include <map>
 #include <set>
+#include <unordered_map>
 
 class KVStore : public KVStoreAPI {
     // You can add your implementation here
@@ -58,7 +59,7 @@ public:
 
     std::vector<std::pair<std::uint64_t, std::string>> search_knn_hnsw(std::string query, int k);
 
-    void load_embedding_to_disk(std::string path);
+    void load_embedding_from_disk(std::string path);
 
     // for test
     void output();

@@ -14,21 +14,20 @@ std::vector<std::string> load_text(std::string filename) {
 }
 
 bool check_result(std::vector<std::pair<std::uint64_t, std::string>> result,
-                  std::vector<std::string> text) {
-  bool ret = false;
+                  std::string text) {
   for (int i = 0; i < result.size(); i++) {
-    if (result[i].second == text[i]) {
-      ret = true;
+    if (result[i].second == text) {
+      return true;
     }
   }
-  return ret;
+  return false;
 }
 
 int main() {
   KVStore store("data/");
 
   // TODO: uncomment this line when you have implemented the function
-  // store.load_embedding_to_disk("embedding_data/");
+  // store.load_hnsw_index_from_disk("hnsw_data/");
 
   int pass = 0;
   int total = 128;
@@ -41,7 +40,7 @@ int main() {
       std::cout << "Error: result.size() != 3" << std::endl;
       continue;
     }
-    if (!check_result(result, text)) {
+    if (!check_result(result, text[i])) {
       std::cout << "Error: value[" << i << "] is not correct" << std::endl;
       continue;
     }

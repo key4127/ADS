@@ -31,7 +31,9 @@ std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, fl
     float entrySim = common_embd_similarity_cos(vec.data(), entry->vec.data(), n);
     visit.insert(entry->key);
     search.push(std::make_pair(entry, entrySim));
-    result.push(std::make_pair(entry, entrySim));
+    if (!isDeleted(entry->key, entry->vec)) { // not delete
+        result.push(std::make_pair(entry, entrySim));
+    }
 
     HWnode* current; // the nearest in search
 
@@ -51,7 +53,9 @@ std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, fl
 
                 if (result.size() < num || currentSim > result.top().second) {
                     search.push(std::make_pair(e, currentSim));
-                    result.push(std::make_pair(e, currentSim));
+                    if (!isDeleted(e->key, e->vec)) {
+                        result.push(std::make_pair(e, currentSim));
+                    }
                 }
             }
         }
@@ -166,7 +170,6 @@ std::vector<uint64_t> HNSW::query(std::vector<float> vec, int k)
     HWnode* entry = head[totalLevel];
 
     for (int l = totalLevel; l > 0; l--) {
-
         std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, float>>, HNbest> result = 
             this->searchLayer(vec, entry, l, 1);
 
@@ -184,4 +187,25 @@ std::vector<uint64_t> HNSW::query(std::vector<float> vec, int k)
     }
 
     return ans;
+}
+
+void HNSW::del(uint64_t key, std::vector<float> vec)
+{
+    deletedKeys.insert(key);
+    deletedNodes.push_back(vec);
+}
+
+bool HNSW::isDeleted(uint64_t key, std::vector<float> vec)
+{
+    if (deletedKeys.find(key) == deletedKeys.end()) {
+        return false;
+    }
+
+    for (int i = 0; i < deletedNodes.size(); i++) {
+        if (deletedNodes[i] == vec) {
+            return true;
+        }
+    }
+
+    return false;
 }

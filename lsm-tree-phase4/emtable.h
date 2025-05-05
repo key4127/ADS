@@ -20,6 +20,8 @@ private:
     std::vector<DataBlock> dataBlock;
     std::string pathDir;
 
+    bool isVecDelete(std::vector<float> vec);
+
 public:
     emtable();
     emtable(const char *path);
@@ -34,6 +36,7 @@ public:
     void reset();
     void put(uint64_t key, std::vector<float> vec);
     void del(uint64_t key);
+    std::vector<float> get(uint64_t key);
 
     std::vector<DataBlock> getDataBlock();
 };
