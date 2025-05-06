@@ -38,3 +38,6 @@ correctness
 model
 #.gitmodules
 third_party/
+
+hnsw_data/
+embedding_data/

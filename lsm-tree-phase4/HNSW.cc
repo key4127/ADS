@@ -2,13 +2,36 @@
 
 HNSW::HNSW()
 {
-    this->totalLevel = -1;
     this->dimension = 768;
-    
+    this->nodeNum = 0;
+
     m_M = 8;
     m_L = 6;
     efConstruction = 35;
     M_max = 18;
+
+    this->totalLevel = m_L + 1;
+
+    for (int i = 0; i <= m_L; i++) {
+        this->head.push_back(nullptr);
+    }
+}
+
+void HNSW::reset()
+{
+    head.clear();
+    nodes.clear();
+    deleted.clear();
+
+    this->dimension = 768;
+    this->nodeNum = 0;
+
+    m_M = 8;
+    m_L = 6;
+    efConstruction = 35;
+    M_max = 18;
+
+    this->totalLevel = m_L + 1;
 
     for (int i = 0; i <= m_L; i++) {
         this->head.push_back(nullptr);
@@ -31,7 +54,7 @@ std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, fl
     float entrySim = common_embd_similarity_cos(vec.data(), entry->vec.data(), n);
     visit.insert(entry->key);
     search.push(std::make_pair(entry, entrySim));
-    if (!isDeleted(entry->key, entry->vec)) { // not delete
+    if (!isDeleted(entry->id, entry->vec)) { // not delete
         result.push(std::make_pair(entry, entrySim));
     }
 
@@ -47,14 +70,14 @@ std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, fl
 
         for (auto e : current->next[layer]) {
 
-            if (visit.find(e->key) == visit.end()) { // not visit
-                visit.insert(e->key);
-                float currentSim = common_embd_similarity_cos(vec.data(), e->vec.data(), n);
+            if (visit.find(nodes[e]->key) == visit.end()) { // not visit
+                visit.insert(nodes[e]->key);
+                float currentSim = common_embd_similarity_cos(vec.data(), nodes[e]->vec.data(), n);
 
                 if (result.size() < num || currentSim > result.top().second) {
-                    search.push(std::make_pair(e, currentSim));
-                    if (!isDeleted(e->key, e->vec)) {
-                        result.push(std::make_pair(e, currentSim));
+                    search.push(std::make_pair(nodes[e], currentSim));
+                    if (!isDeleted(nodes[e]->id, nodes[e]->vec)) {
+                        result.push(std::make_pair(nodes[e], currentSim));
                     }
                 }
             }
@@ -83,14 +106,22 @@ void HNSW::insert(uint64_t key, std::vector<float> vec)
     int n = vec.size();
 
     HWnode *node = new HWnode(key, vec);
-    int level = this->randLevel();
+    node->id = nodeNum;
+    this->nodeNum++;
+    uint32_t level = this->randLevel();
+    node->level = level;
+    nodes.push_back(node);
+
     float nearestSim = std::numeric_limits<float>::max();
     HWnode* entry;
-    if (totalLevel != -1) {
+    if (totalLevel <= m_L) {
         entry = head[totalLevel];
     }
 
     for (int l = totalLevel; l > level; l--) {
+        if (l > m_L) {
+            break;
+        }
 
         std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, float>>, HNbest> result = 
             this->searchLayer(vec, entry, l, 1);
@@ -102,7 +133,7 @@ void HNSW::insert(uint64_t key, std::vector<float> vec)
 
     for (int l = level; l >= 0; l--) {
 
-        if (level > totalLevel) {
+        if (level > totalLevel || totalLevel > m_L) {
             head[l] = node;
             continue;
         }
@@ -130,19 +161,19 @@ void HNSW::insert(uint64_t key, std::vector<float> vec)
                 float currentSim;
 
                 for (auto j = tmp.first->next[l].begin(); j != tmp.first->next[l].end(); j++) {
-                    currentSim = common_embd_similarity_cos(vec.data(), (*j)->vec.data(), n);
+                    currentSim = common_embd_similarity_cos(vec.data(), (nodes[*j])->vec.data(), n);
                     if (currentSim < maxSim) {
                         furthest = j;
                         maxSim = currentSim;
                     }
                 }
 
-                HWnode *toDeleteNei = (*furthest);
+                HWnode *toDeleteNei = (nodes[*furthest]);
                 tmp.first->next[l].erase(furthest);
 
                 auto origin = toDeleteNei->next[l].begin();
                 for (; origin != toDeleteNei->next[l].end(); origin++) {
-                    if ((*origin)->key == tmp.first->key) {
+                    if (nodes[*origin]->key == tmp.first->key) {
                         break;
                     }
                 }
@@ -155,14 +186,18 @@ void HNSW::insert(uint64_t key, std::vector<float> vec)
                 toDeleteNei->next[l].erase(origin);
             }
 
-            node->next[l].push_back(tmp.first);
-            tmp.first->next[l].push_back(node);
+            node->next[l].push_back(tmp.first->id);
+            tmp.first->next[l].push_back(node->id);
 
             result.pop();
         }
     }
 
-    totalLevel = std::max(level, totalLevel);
+    if (totalLevel <= m_L) {
+        totalLevel = std::max(level, totalLevel);
+    } else {
+        totalLevel = level;
+    }
 }
 
 std::vector<uint64_t> HNSW::query(std::vector<float> vec, int k)
@@ -189,22 +224,24 @@ std::vector<uint64_t> HNSW::query(std::vector<float> vec, int k)
     return ans;
 }
 
-void HNSW::del(uint64_t key, std::vector<float> vec)
+void HNSW::del(uint64_t key, std::vector<float> vec) // to prompt
 {
-    deletedKeys.insert(key);
-    deletedNodes.push_back(vec);
-}
-
-bool HNSW::isDeleted(uint64_t key, std::vector<float> vec)
-{
-    if (deletedKeys.find(key) == deletedKeys.end()) {
-        return false;
+    const HWnode *toDelete = nullptr;
+    for (int i = nodes.size() - 1; i >= 0; i--) {
+        if (nodes[i]->key == key) {
+            toDelete = nodes[i];
+        }
     }
 
-    for (int i = 0; i < deletedNodes.size(); i++) {
-        if (deletedNodes[i] == vec) {
-            return true;
-        }
+    if (toDelete != nullptr) {
+        deleted[toDelete->id] = vec;
+    }
+}
+
+bool HNSW::isDeleted(uint32_t id, std::vector<float> vec)
+{
+    if (deleted[id] == vec) {
+        return true;
     }
 
     return false;
@@ -220,11 +257,198 @@ void HNSW::putFile(const std::string &pathDir)
 
     FILE *file;
 
-    file = fopen(path, "wb");
-    fseek(file, 0, SEEK_END);
+    const std::string header = pathDir + "global_header.bin";
+    const char *header_path = header.data();
+    file = fopen(header_path, "wb");
+    fseek(file, 0, SEEK_SET);
+    fwrite(&m_M, 4, 1, file);
+    fwrite(&M_max, 4, 1, file);
+    fwrite(&efConstruction, 4, 1, file);
+    fwrite(&m_L, 4, 1, file);
+    fwrite(&totalLevel, 4, 1, file);
+    fwrite(&nodeNum, 4, 1, file);
+    fwrite(&dimension, 4, 1, file);
+    fclose(file);
+
+    const std::string deleted_string = pathDir + "deleted_nodes.bin";
+    const char *deleted_path = deleted_string.data();
+    file = fopen(deleted_path, "wb");
+    fseek(file, 0, SEEK_SET);
+    int i = 0;
+    for (const auto pair : this->deleted) {
+        fwrite(&pair.first, 4, 1, file);
+
+        std::vector<float> vec = pair.second;
+        for (const auto v : vec) {
+            fwrite(&v, 4, 1, file);
+        }
+        i++;
+    }
+    fclose(file);
+
+    const std::string node_string = pathDir + "nodes/";
+    const char *node_path = node_string.data();
+    if (!utils::dirExists(node_path)) {
+        utils::mkdir(node_path);
+    }
+
+    for (int i = 0; i < nodeNum; i++) {
+        this->putNode(node_string, i);
+    }
 }
 
-void HNSW::loadFile(const std::string &pathDir)
+void HNSW::loadFile(const std::string &pathDir, const std::vector<DataBlock> &data)
 {
+    this->reset();
+    printf("begin\n");
+
+    const char *path = pathDir.data();
+    if (!utils::dirExists(path)) {
+        return;
+    }
+
+    FILE *file;
+
+    const std::string header = pathDir + "global_header.bin";
+    const char *header_path = header.data();
+    file = fopen(header_path, "rb+");
+    fseek(file, 0, SEEK_SET);
+    fread(&m_M, 4, 1, file);
+    fread(&M_max, 4, 1, file);
+    fread(&efConstruction, 4, 1, file);
+    fread(&m_L, 4, 1, file);
+    fread(&totalLevel, 4, 1, file);
+    fread(&nodeNum, 4, 1, file);
+    fread(&dimension, 4, 1, file);
+    fclose(file);
+    printf("phase 1\n");
+
+    const std::string deleted = pathDir + "deleted_nodes.bin";
+    const char *deleted_path = deleted.data();
+    uint32_t id;
+    std::vector<float> vec;
+    file = fopen(deleted_path, "rb+");
+    fseek(file, 0, SEEK_SET);
+    while (fread(&id, 4, 1, file) == 1) {
+        vec.clear();
+        for (int i = 0; i < dimension; i++) {
+            float v;
+            fread(&v, 4, 1, file);
+            vec.push_back(v);
+        }
+        this->deleted.insert({id, vec});
+    }
+    fclose(file);
+    printf("phase 2\n");
+
+    const std::string node_string = pathDir + "nodes/";
+    const char *node_path = node_string.data();
+
+    if (!utils::dirExists(node_path)) {
+        // node num = 0
+        return;
+    } else {
+        for (int i = 0; i < nodeNum; i++) {
+            this->loadNode(node_string, data, i);
+        }
+
+        for (int i = 0; i < nodeNum; i++) {
+            if (head[nodes[i]->level] == nullptr) {
+                head[nodes[i]->level] = nodes[i];
+            }
+        }
+    }
+}
+
+void HNSW::putNode(const std::string &pathDir, int k)
+{
+    std::string nodeDir = pathDir + std::to_string(k) + "/";
     
+    const char *node_path = nodeDir.data();
+    if (!utils::dirExists(node_path)) {
+        utils::mkdir(node_path);
+    }
+
+    FILE *file;
+
+    std::string header = nodeDir + "header.bin";
+    const char *header_path = header.data();
+    file = fopen(header_path, "wb");
+    fseek(file, 0, SEEK_SET);
+    fwrite(&nodes[k]->level, 4, 1, file);
+    fwrite(&nodes[k]->key, 8, 1, file); // ?
+    fclose(file);
+
+    std::string edgeDir = nodeDir + "edges/";
+
+    const char *edges_path = edgeDir.data();
+    if (!utils::dirExists(edges_path)) {
+        utils::mkdir(edges_path);
+    }
+
+    for (int i = 0; i <= nodes[k]->level; i++) {
+        const std::string edge = edgeDir + std::to_string(i) + ".bin";
+        const char *edge_path = edge.data();
+        file = fopen(edge_path, "wb");
+        fseek(file, 0, SEEK_SET);
+
+        uint32_t neiNum = nodes[k]->next[i].size();
+        fwrite(&neiNum, 4, 1, file);
+
+        for (int j = 0; j < neiNum; j++) {
+            fwrite(&nodes[k]->next[i][j], 4, 1, file);
+        }
+
+        fclose(file);
+    }
+}
+
+void HNSW::loadNode(const std::string &pathDir, const std::vector<DataBlock> &data, int k)
+{
+    std::string nodeDir = pathDir + std::to_string(k) + "/";
+    FILE *file;
+
+    HWnode *node = new HWnode();
+    node->id = k;
+
+    std::string header = nodeDir + "header.bin";
+    const char *header_path = header.data();
+    file = fopen(header_path, "rb+");
+    fseek(file, 0, SEEK_SET);
+    fread(&node->level, 4, 1, file);
+    fread(&node->key, 8, 1, file);
+    fclose(file);
+
+    if (deleted.find(k) != deleted.end()) { // to change
+        node->vec = deleted[k];
+    } else {
+        for (int i = data.size() - 1; i >= 0; i--) {
+            if (data[i].key == node->key) {
+                node->vec = data[i].vec;
+                break;
+            }
+        }
+    }
+
+    node->next.resize(m_L + 1);
+    std::string edgeDir = nodeDir + "edges/";
+    for (int i = 0; i <= node->level; i++) {
+        const std::string edge = edgeDir + std::to_string(i) + ".bin";
+        const char *edge_path = edge.data();
+        file = fopen(edge_path, "rb+");
+        fseek(file, 0, SEEK_SET);
+
+        uint32_t neiNum;
+        fread(&neiNum, 4, 1, file);
+
+        for (int j = 0; j < neiNum; j++) {
+            uint32_t neiId;
+            fread(&neiId, 4, 1, file);
+            node->next[i].push_back(neiId);
+        }
+
+        fclose(file);
+    }
+
+    nodes.push_back(node);
 }

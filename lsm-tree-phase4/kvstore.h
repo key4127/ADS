@@ -62,6 +62,7 @@ public:
     void load_embedding_from_disk(std::string path);
 
     void save_hnsw_index_to_disk(const std::string &hnsw_data_root);
+    void load_hnsw_index_from_disk(const std::string &hnsw_data_root);
 
     // for test
     void output();

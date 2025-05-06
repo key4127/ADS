@@ -7,6 +7,7 @@
 #include <vector>
 #include <queue>
 #include <unordered_set>
+#include <unordered_map>
 #include <cmath>
 #include <random>
 #include <chrono>
@@ -14,17 +15,20 @@
 
 #include "embedding.h"
 #include "utils.h"
+#include "emtable.h"
 
-static int m_M;
-static int m_L;
-static int efConstruction;
-static int M_max;
+static uint32_t m_M;
+static uint32_t m_L;
+static uint32_t efConstruction;
+static uint32_t M_max;
 
 class HWnode {
 public:
+    uint32_t id;
+    uint32_t level;
     uint64_t key;
     std::vector<float> vec;
-    std::vector<std::vector<HWnode *>> next;
+    std::vector<std::vector<uint32_t>> next;
 
     HWnode() { }
 
@@ -55,16 +59,20 @@ struct HNworst {
 
 class HNSW {
 private:
-    int dimension;
-    int totalLevel;
+    uint32_t dimension;
+    uint32_t totalLevel;
+    uint32_t nodeNum;
+    std::vector<HWnode *> nodes; // save all nodes
     std::vector<HWnode *> head;
-    std::vector<std::vector<float>> deletedNodes;
-    std::unordered_set<float> deletedKeys;
+    std::unordered_map<uint32_t, std::vector<float>> deleted; // id and vec
 
     int randLevel();
     std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, float>>, HNbest> searchLayer(
         std::vector<float> vec, HWnode* entry, int layer, int num);
-    bool isDeleted(uint64_t, std::vector<float> vec);
+    bool isDeleted(uint32_t id, std::vector<float> vec);
+
+    void putNode(const std::string &path, int k);
+    void loadNode(const std::string &path, const std::vector<DataBlock> &data, int k);
 
 public:
     HNSW();
@@ -72,9 +80,10 @@ public:
     void insert(uint64_t key, std::vector<float> vec);
     void del(uint64_t key, std::vector<float> vec);
     std::vector<uint64_t> query(std::vector<float> vec, int k);
+    void reset();
 
     void putFile(const std::string &path);
-    void loadFile(const std::string &path);
+    void loadFile(const std::string &path, const std::vector<DataBlock> &data);
 };
 
 #endif
