@@ -497,7 +497,7 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
         ans.push_back(std::make_pair(-1, ""));
     }
 
-    std::vector<float> queryVec = getEmbedding(query);
+    std::vector<float> queryVec = embedding(query)[0];
 
     std::unordered_set<uint64_t> key;
     std::vector<DataBlock> data = e.getDataBlock();
@@ -528,7 +528,7 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
 
 std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn_hnsw(std::string query, int k)
 {
-    std::vector<float> vec =  getEmbedding(query);
+    std::vector<float> vec = embedding(query)[0];
 
     auto start = std::chrono::high_resolution_clock::now();
     

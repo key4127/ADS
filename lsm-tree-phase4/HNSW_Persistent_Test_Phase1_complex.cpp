@@ -17,12 +17,26 @@ int main() {
   store.reset();
 
   std::vector<std::string> text = load_text("data/trimmed_text.txt");
-  int total = 128;
+  const int total = 128;
+  const int phase[4] = {0, 32, 64, 96};
+
   for (int i = 0; i < total; i++) {
     store.put(i, text[i]);
   }
 
-  // TODO: uncomment this line when you have implemented the function
+  for(int i = phase[1]; i < total; ++i) {
+    store.del(i);
+  }
+
+  for(int i = phase[2]; i < phase[3]; ++i) {
+    store.put(i, text[i]);
+  }
+
+  for(int i = phase[0]; i < phase[1]; ++i) {
+    int j = i + phase[3];
+    store.put(i, text[j]);
+  }
+
   store.save_hnsw_index_to_disk("hnsw_data/");
 
   return 0;
