@@ -61,7 +61,7 @@ std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, fl
     HWnode* current; // the nearest in search
 
     while (!search.empty()) {
-        if (search.top().second < result.top().second) {
+        if (result.size() != 0 && search.top().second < result.top().second) {
             break;
         }
 
@@ -94,7 +94,9 @@ std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, fl
     std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, float>>, HNbest> ans;
     while (!result.empty()) {
         std::pair<HWnode*, float> tmp = result.top();
-        ans.push(tmp);
+        if (!isDeleted(tmp.first->id, tmp.first->vec)) {
+            ans.push(tmp);
+        }
         result.pop();
     }
 
@@ -103,6 +105,19 @@ std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, fl
 
 void HNSW::insert(uint64_t key, std::vector<float> vec)
 {
+    bool isChange = false;
+    int originNode;
+    for (int i = nodes.size() - 1; i >= 0; i--) {
+        if (nodes[i]->key == key && this->deleted.find(i) == deleted.end()) {
+            isChange = true;
+            originNode = i;
+            break;
+        }
+    }
+    if (isChange) {
+        this->del(key, nodes[originNode]->vec);
+    }
+
     int n = vec.size();
 
     HWnode *node = new HWnode(key, vec);
@@ -126,7 +141,11 @@ void HNSW::insert(uint64_t key, std::vector<float> vec)
         std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, float>>, HNbest> result = 
             this->searchLayer(vec, entry, l, 1);
         
-        entry = result.top().first;
+        if (result.size() != 0) {
+            entry = result.top().first;
+        }  else {
+            entry = head[l];
+        }
     }
 
     bool firstLevel = true;
@@ -208,7 +227,11 @@ std::vector<uint64_t> HNSW::query(std::vector<float> vec, int k)
         std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, float>>, HNbest> result = 
             this->searchLayer(vec, entry, l, 1);
 
-        entry = result.top().first;
+        if (result.size() != 0){
+            entry = result.top().first;
+        } else {
+            entry = head[l];
+        }
     }
 
     std::priority_queue<std::pair<HWnode*, float>, std::vector<std::pair<HWnode*, float>>, HNbest> result = 
@@ -217,6 +240,9 @@ std::vector<uint64_t> HNSW::query(std::vector<float> vec, int k)
     std::vector<uint64_t> ans;
 
     for (int i = 0; i < k; i++) {
+        if (result.empty()) {
+            break;
+        }
         ans.push_back(result.top().first->key);
         result.pop();
     }
@@ -229,7 +255,10 @@ void HNSW::del(uint64_t key, std::vector<float> vec) // to prompt
     const HWnode *toDelete = nullptr;
     for (int i = nodes.size() - 1; i >= 0; i--) {
         if (nodes[i]->key == key) {
-            toDelete = nodes[i];
+            if (this->deleted.find(i) == deleted.end()) {
+                toDelete = nodes[i];
+            }
+            break;
         }
     }
 
@@ -240,7 +269,7 @@ void HNSW::del(uint64_t key, std::vector<float> vec) // to prompt
 
 bool HNSW::isDeleted(uint32_t id, std::vector<float> vec)
 {
-    if (deleted[id] == vec) {
+    if (deleted.find(id) != deleted.end()) {
         return true;
     }
 
@@ -300,7 +329,6 @@ void HNSW::putFile(const std::string &pathDir)
 void HNSW::loadFile(const std::string &pathDir, const std::vector<DataBlock> &data)
 {
     this->reset();
-    printf("begin\n");
 
     const char *path = pathDir.data();
     if (!utils::dirExists(path)) {
@@ -321,7 +349,6 @@ void HNSW::loadFile(const std::string &pathDir, const std::vector<DataBlock> &da
     fread(&nodeNum, 4, 1, file);
     fread(&dimension, 4, 1, file);
     fclose(file);
-    printf("phase 1\n");
 
     const std::string deleted = pathDir + "deleted_nodes.bin";
     const char *deleted_path = deleted.data();
@@ -337,9 +364,9 @@ void HNSW::loadFile(const std::string &pathDir, const std::vector<DataBlock> &da
             vec.push_back(v);
         }
         this->deleted.insert({id, vec});
+        printf("delete %d, vec is %f\n", id, vec[0]);
     }
     fclose(file);
-    printf("phase 2\n");
 
     const std::string node_string = pathDir + "nodes/";
     const char *node_path = node_string.data();
