@@ -58,27 +58,13 @@ int main()
         store.put(i, trimmed_text[i]);
     }
 
-    int k = 3;
-    int knn_idx = 0, hnsw_idx = 0;
-    int idx = 0;
-
     for (int i = 0; i < max; i++) {
-        auto knn_res = store.search_knn(test_text[i], k);
-        auto hnsw_res = store.search_knn_hnsw(test_text[i], k);
-
-        for (int j = 0; j < k; j++) {
-            /*if (knn_res[j].second == ans[idx]) {
-                knn_idx++;
-            }*/
-            if (hnsw_res[j].second == ans[idx]) {
-                hnsw_idx++;
-            }
-            idx++;
+        std::vector<std::pair<std::uint64_t, std::string>> result =
+            store.search_knn(trimmed_text[i], 1);
+        if (result[0].second != trimmed_text[i]) {
+            std::cout << "Error: value[" << i << "] is not correct" << std::endl;
+            //std::cout << result[0].second << "\n";
+            //std::cout << trimmed_text[i] << "\n";
         }
     }
-
-    printf("\n");
-    printf("rate: %d/%d, %.3lf\n", hnsw_idx, 360, static_cast<double>(hnsw_idx) / 360);
-
-    store.output();
 }

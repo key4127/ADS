@@ -15,6 +15,7 @@
 #include <fstream>
 
 #include "embedding.h"
+#include "readEmbedding.h"
 
 #include <chrono>
 
@@ -88,9 +89,9 @@ void KVStore::put(uint64_t key, const std::string &val) {
         nxtsize += 12 + val.length();
     } else
         nxtsize = nxtsize - res.length() + val.length(); // change string
-    std::vector<std::vector<float>> vec = embedding(val);
+    std::vector<float> vec = getVec(val, this->dimension);
     if (nxtsize + 10240 + 32 <= MAXSIZE)
-        s->insert(key, val, vec[0]); // 小于等于（不超过） 2MB
+        s->insert(key, val, vec); // 小于等于（不超过） 2MB
     else {
         sstable ss(s);
         s->reset();
@@ -104,12 +105,12 @@ void KVStore::put(uint64_t key, const std::string &val) {
         addsstable(ss, 0);      // 加入缓存
         ss.putFile(url.data()); // 加入磁盘
         compaction();
-        s->insert(key, val, vec[0]);
+        s->insert(key, val, vec);
     }
 
     if (val != DEL) {
-        h->insert(key, vec[0]);
-        e.put(key, vec[0]);
+        h->insert(key, vec);
+        e.put(key, vec);
     } else {
         std::vector<float> origin = e.get(key);
         h->del(key, origin);
@@ -497,7 +498,7 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
         ans.push_back(std::make_pair(-1, ""));
     }
 
-    std::vector<float> queryVec = embedding(query)[0];
+    std::vector<float> queryVec = getVec(query, this->dimension);
 
     std::unordered_set<uint64_t> key;
     std::vector<DataBlock> data = e.getDataBlock();
@@ -528,7 +529,7 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
 
 std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn_hnsw(std::string query, int k)
 {
-    std::vector<float> vec = embedding(query)[0];
+    std::vector<float> vec = getVec(query, this->dimension);
 
     auto start = std::chrono::high_resolution_clock::now();
     

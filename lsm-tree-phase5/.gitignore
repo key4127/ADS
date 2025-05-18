@@ -41,3 +41,4 @@ third_party/
 # Ignore persistent data
 hnsw_data/
 embedding_data/
+100kdata/
