@@ -48,8 +48,13 @@ void skiplist::insert(uint64_t key, const std::string &str, std::vector<float> v
         
         int newLevel = randLevel();
         for (int level = 0; level < newLevel; level++) {
-            node->nxt[level] = update[level]->nxt[level];
-            update[level]->nxt[level] = node;
+            this->pool->enqueue([node, update, level] {
+                node->nxt[level] = update[level]->nxt[level];
+                update[level]->nxt[level] = node;
+            });
+
+            /*node->nxt[level] = update[level]->nxt[level];
+            update[level]->nxt[level] = node;*/
         }
         this->bytes += (12 + str.length());
     }
@@ -82,9 +87,15 @@ bool skiplist::del(uint64_t key)
         return false;
     } else {
         for (int i = 0; i < curMaxL; i++) {
-            if (update[i]->nxt[i] == current) {
+            this->pool->enqueue([update, current, i]{
+                if (update[i]->nxt[i] == current) {
                 update[i]->nxt[i] = current->nxt[i];
-            }
+                }
+            });
+
+            /*if (update[i]->nxt[i] == current) {
+                update[i]->nxt[i] = current->nxt[i];
+            }*/
         }
         while (curMaxL > 1 && head->nxt[curMaxL] == tail) {
             curMaxL--;

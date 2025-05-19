@@ -9,7 +9,7 @@ include_directories(embedding)
 
 add_executable(report report.cpp kvstore_api.h kvstore.h kvstore.cc
         skiplist.cpp skiplist.h sstable.cpp sstable.h HNSW.h HNSW.cc emtable.h emtable.cpp
-        bloom.cpp bloom.h MurmurHash3.h utils.h test.h readEmbedding.h
+        bloom.cpp bloom.h MurmurHash3.h utils.h test.h readEmbedding.h threadpool.h
         sstablehead.cpp sstablehead.h)
 
 #set_target_properties(E2E_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/test)

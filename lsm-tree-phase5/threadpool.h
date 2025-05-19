@@ -1,3 +1,6 @@
+#ifndef THREAD_POOL_H
+#define THREAD_POOL_H
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -7,12 +10,6 @@
 #include <queue>
 #include <thread>
 #include <vector>
-
-void simulate_work(int id, int duration_ms = 100) {
-  std::this_thread::sleep_for(std::chrono::milliseconds(duration_ms));
-  std::cout << "Task " << id << " completed by thread "
-            << std::this_thread::get_id() << std::endl;
-}
 
 //-------------------------------------------------------------------------------------------------
 // 线程池 (Thread Pool)
@@ -70,29 +67,4 @@ private:
   bool stop;
 };
 
-void test_thread_pool() {
-  ThreadPool pool(4); // 创建一个包含4个工作线程的线程池
-
-  std::atomic<int> completed_tasks_count(0);
-
-  for (int i = 0; i < 10; ++i) {
-    pool.enqueue([i, &completed_tasks_count] {
-      std::cout << "Start Job " << i << " on thread "
-                << std::this_thread::get_id() << std::endl;
-      simulate_work(i, 50 + i * 10);
-      std::cout << "Finish Job " << i << std::endl;
-      completed_tasks_count++;
-    });
-  }
-
-  while (completed_tasks_count < 10) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
-  std::cout << "All Task Finished" << std::endl;
-}
-
-int main() {
-  test_thread_pool();
-
-  return 0;
-}
+#endif

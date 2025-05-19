@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "embedding.h"
+#include "threadpool.h"
 
 enum TYPE {
     HEAD,
@@ -48,6 +49,8 @@ private:
     // for knn insert test
     std::chrono::microseconds duration = std::chrono::microseconds(0);
 
+    ThreadPool *pool;
+
 public:
     skiplist(double p) { // p 表示增长概率
         s       = 1;
@@ -56,6 +59,11 @@ public:
         this->p = p;
         for (int i = 0; i < MAX_LEVEL; ++i)
             head->nxt[i] = tail;
+        pool = new ThreadPool(4);
+    }
+
+    ~skiplist() {
+        delete pool;
     }
 
     slnode *getFirst() {

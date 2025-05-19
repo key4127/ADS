@@ -5,8 +5,6 @@
 #include "kvstore.h"
 #include "embedding.h"
 
-//extern std::chrono::milliseconds tokenize_duration, initialize_duration, batch_duration;
-
 std::vector<std::string> read_file(std::string filename) {
 	std::ifstream file(filename);
     if (!file.is_open()) {
@@ -37,34 +35,41 @@ std::vector<std::string> read_file(std::string filename) {
     return temp;
 }
 
-void embedding_output()
-{
-    //std::cout << "Tokenize elapsed time: " << tokenize_duration.count() << " milliseconds" << std::endl;
-    //std::cout << "Intialize elapsed time: " << initialize_duration.count() << " milliseconds" << std::endl;
-    //std::cout << "Batch elapsed time: " << batch_duration.count() << " milliseconds" << std::endl;
-}
-
 int main()
 {
-    auto trimmed_text = read_file("./data/trimmed_text.txt");
-    auto test_text = read_file("./data/test_text.txt");
-    auto ans = read_file("./data/test_text_ans.txt");
+    auto text = read_file("./data/cleaned_text_100k.txt");
     class KVStore store("./data");
     store.reset();
 
-    const uint64_t max = 120;
+    const uint64_t max = 1000;
 
+    auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < max; i++) {
-        store.put(i, trimmed_text[i]);
+        if ((i + 1) % 1000 == 0) {
+            std::cout << "Put 500 items.\n";
+        }
+        store.put(i, text[2 * i + 1]);
     }
 
     for (int i = 0; i < max; i++) {
-        std::vector<std::pair<std::uint64_t, std::string>> result =
-            store.search_knn(trimmed_text[i], 1);
-        if (result[0].second != trimmed_text[i]) {
-            std::cout << "Error: value[" << i << "] is not correct" << std::endl;
-            //std::cout << result[0].second << "\n";
-            //std::cout << trimmed_text[i] << "\n";
+        if ((i + 1) % 1000 == 0) {
+            std::cout << "Del 500 items.\n";
+        }
+        store.del(i);
+        if (store.get(i) != "") {
+            std::cout << "error: \n" << store.get(i);
         }
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+
+    std::cout << "put cost " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "ms\n";
+
+    /*for (int i = 0; i < max; i++) {
+        std::vector<std::pair<std::uint64_t, std::string>> result =
+            store.search_knn(text[i], 1);
+        if (result[0].second != text[i]) {
+            std::cout << "Error: value[" << i << "] is not correct" << std::endl;
+        }
+    }*/
 }
