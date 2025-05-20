@@ -53,17 +53,20 @@ int main()
 
     for (int i = 0; i < max; i++) {
         if ((i + 1) % 1000 == 0) {
-            std::cout << "Del 500 items.\n";
+            std::cout << "Get 500 items.\n";
+        }
+        if (store.get(i) != text[2 * i + 1]) {
+            std::cout << "error: " << i << " " <<store.get(i) << std::endl;
         }
         store.del(i);
         if (store.get(i) != "") {
-            std::cout << "error: \n" << store.get(i);
+            std::cout << "error: " << i << std::endl;
         }
     }
 
     auto end = std::chrono::high_resolution_clock::now();
 
-    std::cout << "put cost " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "ms\n";
+    std::cout << "cost " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "ms\n";
 
     /*for (int i = 0; i < max; i++) {
         std::vector<std::pair<std::uint64_t, std::string>> result =

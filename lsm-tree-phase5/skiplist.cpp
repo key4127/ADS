@@ -47,14 +47,19 @@ void skiplist::insert(uint64_t key, const std::string &str, std::vector<float> v
         this->duration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
         
         int newLevel = randLevel();
+        std::atomic<int> completed_tasks_count(0);
         for (int level = 0; level < newLevel; level++) {
-            this->pool->enqueue([node, update, level] {
+            this->pool->enqueue([node, update, level, &completed_tasks_count] {
                 node->nxt[level] = update[level]->nxt[level];
                 update[level]->nxt[level] = node;
+                completed_tasks_count++;
             });
 
             /*node->nxt[level] = update[level]->nxt[level];
             update[level]->nxt[level] = node;*/
+        }
+        while (completed_tasks_count < newLevel) {
+            std::this_thread::sleep_for(std::chrono::nanoseconds(100));
         }
         this->bytes += (12 + str.length());
     }
@@ -86,17 +91,23 @@ bool skiplist::del(uint64_t key)
     if (current == nullptr || (current != nullptr && current->key != key)) {
         return false;
     } else {
+        std::atomic<int> completed_tasks_count(0);
         for (int i = 0; i < curMaxL; i++) {
-            this->pool->enqueue([update, current, i]{
+            this->pool->enqueue([update, current, i, &completed_tasks_count]{
                 if (update[i]->nxt[i] == current) {
-                update[i]->nxt[i] = current->nxt[i];
+                    update[i]->nxt[i] = current->nxt[i];
                 }
+                completed_tasks_count++;
             });
 
             /*if (update[i]->nxt[i] == current) {
                 update[i]->nxt[i] = current->nxt[i];
             }*/
         }
+        while (completed_tasks_count < curMaxL) {
+            std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+        }
+
         while (curMaxL > 1 && head->nxt[curMaxL] == tail) {
             curMaxL--;
         }
