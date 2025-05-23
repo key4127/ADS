@@ -36,14 +36,6 @@ void emtable::putFile(const char *path)
             fwrite(&this->dataBlock[i].vec[j], 4, 1, file);
         }
     }
-
-    /*for (int i = 0; i < dataBlock.size(); i++) {
-        printf("the %d key: %lld\n", i, dataBlock[i].key);
-        for (int j = 0; j < 5; j++) {
-            printf("%lf ", dataBlock[i].vec[j]);
-        }
-        printf("\n");
-    }*/
 }
 
 void emtable::loadFile(const char *path) // to empty datablock
@@ -85,14 +77,6 @@ void emtable::loadFile(const char *path) // to empty datablock
             this->dataBlock.push_back(originData[i]);
         }
     }
-
-    /*for (int i = 0; i < dataBlock.size(); i++) {
-        printf("the %d key: %lld\n", i, dataBlock[i].key);
-        for (int j = 0; j < 5; j++) {
-            printf("%lf ", dataBlock[i].vec[j]);
-        }
-        printf("\n");
-    }*/
 }
 
 void emtable::put(uint64_t key, std::vector<float> vec)

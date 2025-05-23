@@ -41,43 +41,29 @@ int main()
     class KVStore store("./data");
     store.reset();
 
-    const uint64_t max = 10000;
-
-    auto start = std::chrono::high_resolution_clock::now();
+    const uint64_t max = 100;
 
     for (int i = 0; i < max; i++) {
-        if ((i + 1) % 2000 == 0) {
-            std::cout << "Put 1000 items.\n";
-        }
         store.put(i, text[2 * i + 1]);
     }
 
     for (int i = 0; i < max; i++) {
-        if ((i + 1) % 2000 == 0) {
-            std::cout << "Get 1000 items.\n";
+        std::vector<std::pair<std::uint64_t, std::string>> result =
+            store.search_knn(text[2 * i + 1], 1);
+        if (result[0].second != text[2 * i + 1]) {
+            std::cout << "Error: value[" << i << "] is not correct" << std::endl;
         }
-        if (store.get(i) != text[2 * i + 1]) {
-            std::cout << "error: " << i << "\n";
-        }
-        if (!store.del(i)) {
-            std::cout << "delete error\n";
-        }
-        if (store.get(i) != "") {
-            std::cout << "get empty error\n";
+        store.del(i);
+        result = store.search_knn(text[2 * i + 1], 1);
+        if (result.size() >= 1 && result[0].second == text[2 * i + 1]) {
+            std::cout << "Error: value[" << i << "] is not correct" << std::endl;
         }
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
+    
 
+    //auto end = std::chrono::high_resolution_clock::now();
     //std::cout << "Total cost: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
 
     //store.output();
-
-    /*for (int i = 0; i < max; i++) {
-        std::vector<std::pair<std::uint64_t, std::string>> result =
-            store.search_knn(text[i], 1);
-        if (result[0].second != text[i]) {
-            std::cout << "Error: value[" << i << "] is not correct" << std::endl;
-        }
-    }*/
 }

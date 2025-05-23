@@ -103,8 +103,8 @@ void KVStore::put(uint64_t key, const std::string &val) {
         nxtsize += 12 + val.length();
     } else
         nxtsize = nxtsize - res.length() + val.length(); // change string
-    //std::vector<float> vec = getVec(val, this->dimension);
-    std::vector<float> vec(this->dimension);
+    std::vector<float> vec = getVec(val, this->dimension);
+    //std::vector<float> vec(this->dimension);
     if (nxtsize + 10240 + 32 <= MAXSIZE) {
         auto start = std::chrono::high_resolution_clock::now();
         s->insert(key, val, vec, pool); // 小于等于（不超过） 2MB
