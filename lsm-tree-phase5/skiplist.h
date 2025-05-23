@@ -49,8 +49,6 @@ private:
     // for knn insert test
     std::chrono::microseconds duration = std::chrono::microseconds(0);
 
-    ThreadPool *pool;
-
 public:
     skiplist(double p) { // p 表示增长概率
         s       = 1;
@@ -59,11 +57,10 @@ public:
         this->p = p;
         for (int i = 0; i < MAX_LEVEL; ++i)
             head->nxt[i] = tail;
-        pool = new ThreadPool(4);
     }
 
     ~skiplist() {
-        delete pool;
+
     }
 
     slnode *getFirst() {
@@ -72,9 +69,9 @@ public:
 
     double my_rand();
     int randLevel();
-    void insert(uint64_t key, const std::string &str, std::vector<float> vec);
+    void insert(uint64_t key, const std::string &str, std::vector<float> vec, ThreadPool *pool);
     std::string search(uint64_t key);
-    bool del(uint64_t key);
+    bool del(uint64_t key, ThreadPool *pool);
     void scan(uint64_t key1, uint64_t key2, std::vector<std::pair<uint64_t, std::string>> &list);
     slnode *lowerBound(uint64_t key);
     void reset();
@@ -83,9 +80,9 @@ public:
     std::vector<std::vector<float>> getVec();
     std::vector<uint64_t> getKey();
 
-    std::chrono::microseconds getDuration() {
+    /*std::chrono::microseconds getDuration() {
         return duration;
-    }
+    }*/
 };
 
 #endif // LSM_KV_SKIPLIST_H

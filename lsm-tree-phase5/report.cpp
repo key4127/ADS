@@ -41,32 +41,37 @@ int main()
     class KVStore store("./data");
     store.reset();
 
-    const uint64_t max = 1000;
+    const uint64_t max = 10000;
 
     auto start = std::chrono::high_resolution_clock::now();
+
     for (int i = 0; i < max; i++) {
-        if ((i + 1) % 1000 == 0) {
-            std::cout << "Put 500 items.\n";
+        if ((i + 1) % 2000 == 0) {
+            std::cout << "Put 1000 items.\n";
         }
         store.put(i, text[2 * i + 1]);
     }
 
     for (int i = 0; i < max; i++) {
-        if ((i + 1) % 1000 == 0) {
-            std::cout << "Get 500 items.\n";
+        if ((i + 1) % 2000 == 0) {
+            std::cout << "Get 1000 items.\n";
         }
         if (store.get(i) != text[2 * i + 1]) {
-            std::cout << "error: " << i << " " <<store.get(i) << std::endl;
+            std::cout << "error: " << i << "\n";
         }
-        store.del(i);
+        if (!store.del(i)) {
+            std::cout << "delete error\n";
+        }
         if (store.get(i) != "") {
-            std::cout << "error: " << i << std::endl;
+            std::cout << "get empty error\n";
         }
     }
 
     auto end = std::chrono::high_resolution_clock::now();
 
-    std::cout << "cost " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "ms\n";
+    //std::cout << "Total cost: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
+
+    //store.output();
 
     /*for (int i = 0; i < max; i++) {
         std::vector<std::pair<std::uint64_t, std::string>> result =

@@ -6,6 +6,7 @@
 #include "sstable.h"
 #include "sstablehead.h"
 #include "emtable.h"
+#include "threadpool.h"
 #include <chrono>
 #include <iostream>
 
@@ -26,13 +27,14 @@ private:
 
     HNSW *h = new HNSW();
 
-    std::chrono::microseconds knnInsertDuration = std::chrono::microseconds(0);
-    std::chrono::microseconds knnQueryDuration = std::chrono::microseconds(0);
-    std::chrono::microseconds hnswInsertDuration = std::chrono::microseconds(0);
-    std::chrono::microseconds hnswQueryDuration = std::chrono::microseconds(0);
+    std::chrono::microseconds skipInsertDuration = std::chrono::microseconds(0);
+    std::chrono::microseconds skipDeleteDuration = std::chrono::microseconds(0);
+    std::chrono::microseconds skipGetDuration = std::chrono::microseconds(0);
 
     static const uint64_t dimension = 768;
 
+    ThreadPool *pool;
+    
 public:
     KVStore(const std::string &dir);
 

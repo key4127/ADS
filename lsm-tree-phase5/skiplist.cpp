@@ -14,7 +14,7 @@ int skiplist::randLevel()
     return level;
 }
 
-void skiplist::insert(uint64_t key, const std::string &str, std::vector<float> vec)
+void skiplist::insert(uint64_t key, const std::string &str, std::vector<float> vec, ThreadPool *pool)
 {
     std::vector<slnode*> update(MAX_LEVEL, head);
     slnode *current = head;
@@ -49,7 +49,7 @@ void skiplist::insert(uint64_t key, const std::string &str, std::vector<float> v
         int newLevel = randLevel();
         std::atomic<int> completed_tasks_count(0);
         for (int level = 0; level < newLevel; level++) {
-            this->pool->enqueue([node, update, level, &completed_tasks_count] {
+            pool->enqueue([node, update, level, &completed_tasks_count] {
                 node->nxt[level] = update[level]->nxt[level];
                 update[level]->nxt[level] = node;
                 completed_tasks_count++;
@@ -75,7 +75,7 @@ std::string skiplist::search(uint64_t key)
     }
 }
 
-bool skiplist::del(uint64_t key)
+bool skiplist::del(uint64_t key, ThreadPool *pool)
 {
     std::vector<slnode*> update(MAX_LEVEL, head);
     slnode *current = head;
@@ -93,7 +93,7 @@ bool skiplist::del(uint64_t key)
     } else {
         std::atomic<int> completed_tasks_count(0);
         for (int i = 0; i < curMaxL; i++) {
-            this->pool->enqueue([update, current, i, &completed_tasks_count]{
+            pool->enqueue([update, current, i, &completed_tasks_count]{
                 if (update[i]->nxt[i] == current) {
                     update[i]->nxt[i] = current->nxt[i];
                 }

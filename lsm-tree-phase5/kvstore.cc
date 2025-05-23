@@ -40,6 +40,8 @@ struct cmpPoi {
 KVStore::KVStore(const std::string &dir) :
     KVStoreAPI(dir) // read from sstables
 {
+    pool = new ThreadPool(std::thread::hardware_concurrency());
+
     for (totalLevel = 0;; ++totalLevel) {
         std::string path = dir + "/level-" + std::to_string(totalLevel) + "/";
         std::vector<std::string> files;
@@ -48,13 +50,23 @@ KVStore::KVStore(const std::string &dir) :
             break; // stop read
         }
         int nums = utils::scanDir(path, files);
-        sstablehead cur;
+        std::condition_variable cv;
+        std::atomic<int> completed_tasks_count(0);
+        std::mutex sstableMutex;
         for (int i = 0; i < nums; ++i) {       // 读每一个文件头
-            std::string url = path + files[i]; // url, 每一个文件名
-            cur.loadFileHead(url.data());
-            sstableIndex[totalLevel].push_back(cur);
-            TIME = std::max(TIME, cur.getTime()); // 更新时间戳
+            pool->enqueue([path, files, i, &completed_tasks_count, &sstableMutex, &cv, this]{
+                sstablehead cur;
+                std::string url = path + files[i]; // url, 每一个文件名
+                cur.loadFileHead(url.data());
+                std::unique_lock<std::mutex> lock(sstableMutex);
+                sstableIndex[totalLevel].push_back(cur);
+                TIME = std::max(TIME, cur.getTime()); // 更新时间戳
+                completed_tasks_count++;
+                cv.notify_one();
+            });
         }
+        std::unique_lock<std::mutex> lock(sstableMutex);
+        cv.wait(lock, [&] { return completed_tasks_count == nums; });
     }
 
     // e
@@ -76,6 +88,8 @@ KVStore::~KVStore()
     ss.putFile(ss.getFilename().data());
     e.putFile(hPath.data());
     compaction(); // 从0层开始尝试合并
+
+    delete pool;
 }
 
 /**
@@ -89,9 +103,18 @@ void KVStore::put(uint64_t key, const std::string &val) {
         nxtsize += 12 + val.length();
     } else
         nxtsize = nxtsize - res.length() + val.length(); // change string
-    std::vector<float> vec = getVec(val, this->dimension);
-    if (nxtsize + 10240 + 32 <= MAXSIZE)
-        s->insert(key, val, vec); // 小于等于（不超过） 2MB
+    //std::vector<float> vec = getVec(val, this->dimension);
+    std::vector<float> vec(this->dimension);
+    if (nxtsize + 10240 + 32 <= MAXSIZE) {
+        auto start = std::chrono::high_resolution_clock::now();
+        s->insert(key, val, vec, pool); // 小于等于（不超过） 2MB
+        auto end = std::chrono::high_resolution_clock::now();
+        if (val != DEL) {
+            skipInsertDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        } else {
+            skipDeleteDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        }
+    }
     else {
         sstable ss(s);
         s->reset();
@@ -105,7 +128,14 @@ void KVStore::put(uint64_t key, const std::string &val) {
         addsstable(ss, 0);      // 加入缓存
         ss.putFile(url.data()); // 加入磁盘
         compaction();
-        s->insert(key, val, vec);
+        auto start = std::chrono::high_resolution_clock::now();
+        s->insert(key, val, vec, pool);
+        auto end = std::chrono::high_resolution_clock::now();
+        if (val != DEL) {
+            skipInsertDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        } else {
+            skipDeleteDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        }
     }
 
     if (val != DEL) {
@@ -128,7 +158,10 @@ std::string KVStore::get(uint64_t key) //
     int goalOffset;
     uint32_t goalLen;
     std::string goalUrl;
+    auto start = std::chrono::high_resolution_clock::now();
     std::string res = s->search(key);
+    auto end = std::chrono::high_resolution_clock::now();
+    skipGetDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     if (res.length()) { // 在memtable中找到, 或者是deleted，说明最近被删除过，
                         // 不用查sstable
         if (res == DEL)
@@ -342,30 +375,52 @@ void KVStore::compaction() {
             lowerBound = std::min(lowerBound, sstableIndex[level][i].getMinV());
             upperBound = std::max(upperBound, sstableIndex[level][i].getMaxV());
 
-            poi tmp;
-            tmp.sstableId = toMergeTableNums++;
-            tmp.time = sstableIndex[level][i].getTime();
-
-            for (int j = 0; j < sstableIndex[level][i].getCnt(); j++) {
-                tmp.pos = j;
-                tmp.index = sstableIndex[level][i].getIndexById(j);
-                toMergePairs.push_back(tmp);
+            std::condition_variable cv;
+            std::atomic<int> completed_tasks_count(0);
+            std::mutex toMergePairsMutex;
+            int tmpCnt = sstableIndex[level][i].getCnt();
+            for (int j = 0; j < tmpCnt; j++) {
+                pool->enqueue([i, j, level, toMergeTableNums, &toMergePairs, &toMergePairsMutex, &completed_tasks_count, &cv, this] {
+                    poi tmp;
+                    tmp.sstableId = toMergeTableNums;
+                    tmp.time = sstableIndex[level][i].getTime();
+                    tmp.pos = j;
+                    tmp.index = sstableIndex[level][i].getIndexById(j);
+                    std::unique_lock<std::mutex> lock(toMergePairsMutex);
+                    toMergePairs.push_back(tmp);
+                    completed_tasks_count++;
+                    cv.notify_one();
+                });
             }
+            std::unique_lock<std::mutex> lock(toMergePairsMutex);
+            cv.wait(lock, [&] { return completed_tasks_count == tmpCnt; });
 
+            toMergeTableNums++;
             toMergeHeads.push_back(sstableIndex[level][i]);
         }
         if (level != totalLevel) {
             for (int i = 0; i < sstableIndex[level + 1].size(); i++) {
-                poi tmp;
-                tmp.sstableId = toMergeTableNums;
-                tmp.time = sstableIndex[level + 1][i].getTime();
-
                 if (std::max(sstableIndex[level + 1][i].getMinV(), lowerBound) <= std::min(sstableIndex[level + 1][i].getMaxV(), upperBound)) {
-                    for (int j = 0; j < sstableIndex[level + 1][i].getCnt(); j++) {
-                        tmp.pos = j;
-                        tmp.index = sstableIndex[level + 1][i].getIndexById(j);
-                        toMergePairs.push_back(tmp);
+                    std::condition_variable cv;
+                    std::mutex toMergePairsMutex;
+                    std::atomic<int> completed_tasks_count(0);
+                    int tmpCnt = sstableIndex[level + 1][i].getCnt();
+
+                    for (int j = 0; j < tmpCnt; j++) {
+                        pool->enqueue([i, j, level, toMergeTableNums, &toMergePairs, &toMergePairsMutex, &completed_tasks_count, &cv, this] {
+                            poi tmp;
+                            tmp.sstableId = toMergeTableNums;
+                            tmp.time = sstableIndex[level + 1][i].getTime();   
+                            tmp.pos = j;
+                            tmp.index = sstableIndex[level + 1][i].getIndexById(j);
+                            std::unique_lock<std::mutex> lock(toMergePairsMutex);
+                            toMergePairs.push_back(tmp);
+                            completed_tasks_count++;
+                            cv.notify_one();
+                        });
                     }
+                    std::unique_lock<std::mutex> lock(toMergePairsMutex);
+                    cv.wait(lock, [&] { return completed_tasks_count == tmpCnt; });
 
                     toMergeTableNums++;
                     toMergeHeads.push_back(sstableIndex[level + 1][i]);
@@ -522,8 +577,6 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
 
     auto end = std::chrono::high_resolution_clock::now();
 
-    this->knnQueryDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
     return ans;
 }
 
@@ -544,26 +597,7 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn_hnsw(std:
 
     auto end = std::chrono::high_resolution_clock::now();
 
-    this->hnswQueryDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
     return ans;
-}
-
-void KVStore::output()
-{
-    //this->knnInsertDuration = s->getDuration();
-
-    /*printf("knn: \n");
-    std::cout << "insert time: " << knnInsertDuration.count() << "ms\n";
-    std::cout << " query time: " << knnQueryDuration.count() << "ms\n";
-    printf("\n");*/
-
-    /*printf("hnsw: \n");
-    std::cout << "insert time: " << hnswInsertDuration.count() << "ms\n";
-    std::cout << " query time: " << hnswQueryDuration.count() << "ms\n";
-    printf("\n");*/
-
-    std::cout << "time: " << hnswInsertDuration.count() + hnswQueryDuration.count() << "ms\n\n";
 }
 
 void KVStore::load_embedding_from_disk(std::string path)
@@ -579,4 +613,11 @@ void KVStore::save_hnsw_index_to_disk(const std::string &hnsw_data_root)
 void KVStore::load_hnsw_index_from_disk(const std::string &hnsw_data_root)
 {
     h->loadFile(hnsw_data_root, e.getDataBlock());
+}
+
+void KVStore::output()
+{
+    std::cout << "inser cost: " << skipInsertDuration.count() << std::endl;
+    std::cout << "get: cost: " << skipGetDuration.count() << std::endl;
+    std::cout << "delete cost: " << skipDeleteDuration.count() << std::endl;
 }
