@@ -71,7 +71,7 @@ KVStore::KVStore(const std::string &dir) :
 
     // e
     std::string hPath = "embedding_data/";
-    e.loadFile(hPath.data());
+    e.loadFile(hPath.data(), pool);
 }
 
 KVStore::~KVStore()
@@ -142,7 +142,7 @@ void KVStore::put(uint64_t key, const std::string &val) {
         h->insert(key, vec);
         e.put(key, vec);
     } else {
-        std::vector<float> origin = e.get(key);
+        std::vector<float> origin = e.get(key, pool);
         h->del(key, origin);
         e.del(key);
     }
@@ -572,6 +572,9 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn(std::stri
     sort(sim.begin(), sim.end(), simCmp);
 
     for (int i = 0; i < k; i++) {
+        if (sim.size() <= i) {
+            break;
+        }
         ans[i] = std::make_pair(sim[i].first, this->get(sim[i].first));
     }
 
@@ -602,7 +605,7 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn_hnsw(std:
 
 void KVStore::load_embedding_from_disk(std::string path)
 {
-    e.loadFile(path.data());
+    e.loadFile(path.data(), pool);
 }
 
 void KVStore::save_hnsw_index_to_disk(const std::string &hnsw_data_root)

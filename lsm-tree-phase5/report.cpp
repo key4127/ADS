@@ -39,19 +39,35 @@ int main()
 {
     auto text = read_file("./data/cleaned_text_100k.txt");
     class KVStore store("./data");
-    store.reset();
+    //store.reset();
 
-    const uint64_t max = 100;
+    const uint64_t max = 50;
 
-    for (int i = 0; i < max; i++) {
+    /*for (int i = 0; i < max; i++) {
         store.put(i, text[2 * i + 1]);
     }
+    for (int i = max; i < 2 * max; i++) {
+        store.put(i, text[2 * i + 1]);
+        store.del(i - max);
+    }*/
 
     for (int i = 0; i < max; i++) {
         std::vector<std::pair<std::uint64_t, std::string>> result =
             store.search_knn(text[2 * i + 1], 1);
-        if (result[0].second != text[2 * i + 1]) {
+        if (result.size() >= 1 && result[0].second == text[2 * i + 1]) {
             std::cout << "Error: value[" << i << "] is not correct" << std::endl;
+        }
+    }
+    printf("first part end\n");
+    for (int i = max; i < 2 * max; i++) {
+        std::vector<std::pair<std::uint64_t, std::string>> result =
+            store.search_knn(text[2 * i + 1], 1);
+        if (result.size() == 0) {
+            std::cout << "Error: value[" << i << "] is empty" << std::endl;
+            continue;
+        }
+        if (result[0].second != text[2 * i + 1]) {
+            std::cout << "Error: value[" << i << "] before delete is not correct" << std::endl;
         }
         store.del(i);
         result = store.search_knn(text[2 * i + 1], 1);
@@ -59,7 +75,7 @@ int main()
             std::cout << "Error: value[" << i << "] is not correct" << std::endl;
         }
     }
-
+    printf("all tests end\n");
     
 
     //auto end = std::chrono::high_resolution_clock::now();
