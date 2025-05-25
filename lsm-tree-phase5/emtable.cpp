@@ -64,8 +64,7 @@ void emtable::loadFile(const char *path, ThreadPool *pool) // to empty datablock
     int chunkSize = dataNum % num_threads ?
                     dataNum / num_threads + 1 :
                     dataNum / num_threads;
-    int task_num = std::min(num_threads, dataNum);
-
+    int task_num = (dataNum + chunkSize - 1) / chunkSize;
     std::atomic<int> complete_task_num(0);
     std::vector<std::vector<DataBlock>> originData(num_threads);
 
@@ -176,7 +175,7 @@ std::vector<float> emtable::get(uint64_t key, ThreadPool *pool)
     std::mutex getMutex;
     std::atomic<int> complete_task_num(0);
 
-    int cnt = std::min((int)dataBlock.size(), num_threads);
+    int cnt = ((int)dataBlock.size() + chunk_size - 1) / chunk_size;
     std::vector<int> id(cnt, -1);
 
     for (int i = dataBlock.size() - 1; i >= 0; i -= chunk_size) {

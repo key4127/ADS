@@ -3,6 +3,7 @@
 #ifndef LSM_KV_SSTABLEHEAD_H
 #define LSM_KV_SSTABLEHEAD_H
 #include "bloom.h"
+#include "threadpool.h"
 
 #include <cstdint>
 #include <vector>
@@ -50,7 +51,7 @@ public:
         bytes  = 10240 + 32;
     }
 
-    void loadFileHead(const char *path);
+    void loadFileHead(const char *path, ThreadPool *pool);
     void reset();
 
     void setFilename(std::string filename) {

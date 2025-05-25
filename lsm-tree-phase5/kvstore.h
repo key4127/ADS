@@ -30,6 +30,10 @@ private:
     std::chrono::microseconds skipInsertDuration = std::chrono::microseconds(0);
     std::chrono::microseconds skipDeleteDuration = std::chrono::microseconds(0);
     std::chrono::microseconds skipGetDuration = std::chrono::microseconds(0);
+    std::chrono::microseconds compactionDuration = std::chrono::microseconds(0);
+    std::chrono::microseconds readDuration = std::chrono::microseconds(0);
+    std::chrono::microseconds putFileDuration = std::chrono::microseconds(0);
+    int compactionNum = 0;
 
     static const uint64_t dimension = 768;
 
@@ -69,4 +73,5 @@ public:
     // for test
     void output();
 
+    void testEmtable(int max);
 };

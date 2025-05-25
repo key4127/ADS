@@ -40,6 +40,8 @@ struct cmpPoi {
 KVStore::KVStore(const std::string &dir) :
     KVStoreAPI(dir) // read from sstables
 {
+    auto start = std::chrono::high_resolution_clock::now();
+
     pool = new ThreadPool(std::thread::hardware_concurrency());
 
     for (totalLevel = 0;; ++totalLevel) {
@@ -54,28 +56,28 @@ KVStore::KVStore(const std::string &dir) :
         std::atomic<int> completed_tasks_count(0);
         std::mutex sstableMutex;
         for (int i = 0; i < nums; ++i) {       // 读每一个文件头
-            pool->enqueue([path, files, i, &completed_tasks_count, &sstableMutex, &cv, this]{
-                sstablehead cur;
-                std::string url = path + files[i]; // url, 每一个文件名
-                cur.loadFileHead(url.data());
-                std::unique_lock<std::mutex> lock(sstableMutex);
-                sstableIndex[totalLevel].push_back(cur);
-                TIME = std::max(TIME, cur.getTime()); // 更新时间戳
-                completed_tasks_count++;
-                cv.notify_one();
-            });
+            sstablehead cur;
+            std::string url = path + files[i]; // url, 每一个文件名
+            cur.loadFileHead(url.data(), pool);
+            sstableIndex[totalLevel].push_back(cur);
+            TIME = std::max(TIME, cur.getTime()); // 更新时间戳
         }
-        std::unique_lock<std::mutex> lock(sstableMutex);
-        cv.wait(lock, [&] { return completed_tasks_count == nums; });
     }
 
     // e
     std::string hPath = "embedding_data/";
+    std::cout << "begin emtable load\n";
     e.loadFile(hPath.data(), pool);
+    std::cout << "end emtable load\n";
+
+    auto end = std::chrono::high_resolution_clock::now();
+    readDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 }
 
 KVStore::~KVStore()
 {
+    auto start = std::chrono::high_resolution_clock::now();
+
     sstable ss(s);
     if (!ss.getCnt())
         return; // empty sstable
@@ -88,6 +90,10 @@ KVStore::~KVStore()
     ss.putFile(ss.getFilename().data());
     e.putFile(hPath.data());
     compaction(); // 从0层开始尝试合并
+
+    auto end = std::chrono::high_resolution_clock::now();
+    putFileDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "Total put file cost: " << putFileDuration.count() << "\n";
 
     delete pool;
 }
@@ -142,9 +148,12 @@ void KVStore::put(uint64_t key, const std::string &val) {
         h->insert(key, vec);
         e.put(key, vec);
     } else {
+        auto start = std::chrono::high_resolution_clock::now();
         std::vector<float> origin = e.get(key, pool);
+        auto end = std::chrono::high_resolution_clock::now();
         h->del(key, origin);
         e.del(key);
+        skipDeleteDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     }
 }
 
@@ -335,6 +344,8 @@ void KVStore::compaction() {
     }
     //printf("compaction begin\n");
 
+    compactionNum++;
+    auto start = std::chrono::high_resolution_clock::now();
     std::vector<sstable> newTables;
     std::vector<sstablehead> toMergeHeads;
     std::vector<poi> toMergePairs;
@@ -375,25 +386,25 @@ void KVStore::compaction() {
             lowerBound = std::min(lowerBound, sstableIndex[level][i].getMinV());
             upperBound = std::max(upperBound, sstableIndex[level][i].getMaxV());
 
-            std::condition_variable cv;
             std::atomic<int> completed_tasks_count(0);
             std::mutex toMergePairsMutex;
             int tmpCnt = sstableIndex[level][i].getCnt();
             for (int j = 0; j < tmpCnt; j++) {
-                pool->enqueue([i, j, level, toMergeTableNums, &toMergePairs, &toMergePairsMutex, &completed_tasks_count, &cv, this] {
+                pool->enqueue([i, j, level, toMergeTableNums, &toMergePairs, &toMergePairsMutex, &completed_tasks_count, this] {
                     poi tmp;
                     tmp.sstableId = toMergeTableNums;
                     tmp.time = sstableIndex[level][i].getTime();
                     tmp.pos = j;
                     tmp.index = sstableIndex[level][i].getIndexById(j);
-                    std::unique_lock<std::mutex> lock(toMergePairsMutex);
+                    std::lock_guard<std::mutex> lock(toMergePairsMutex);
                     toMergePairs.push_back(tmp);
                     completed_tasks_count++;
-                    cv.notify_one();
                 });
             }
-            std::unique_lock<std::mutex> lock(toMergePairsMutex);
-            cv.wait(lock, [&] { return completed_tasks_count == tmpCnt; });
+
+            while (completed_tasks_count < tmpCnt) {
+                std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+            }
 
             toMergeTableNums++;
             toMergeHeads.push_back(sstableIndex[level][i]);
@@ -401,26 +412,26 @@ void KVStore::compaction() {
         if (level != totalLevel) {
             for (int i = 0; i < sstableIndex[level + 1].size(); i++) {
                 if (std::max(sstableIndex[level + 1][i].getMinV(), lowerBound) <= std::min(sstableIndex[level + 1][i].getMaxV(), upperBound)) {
-                    std::condition_variable cv;
                     std::mutex toMergePairsMutex;
                     std::atomic<int> completed_tasks_count(0);
                     int tmpCnt = sstableIndex[level + 1][i].getCnt();
 
                     for (int j = 0; j < tmpCnt; j++) {
-                        pool->enqueue([i, j, level, toMergeTableNums, &toMergePairs, &toMergePairsMutex, &completed_tasks_count, &cv, this] {
+                        pool->enqueue([i, j, level, toMergeTableNums, &toMergePairs, &toMergePairsMutex, &completed_tasks_count, this] {
                             poi tmp;
                             tmp.sstableId = toMergeTableNums;
                             tmp.time = sstableIndex[level + 1][i].getTime();   
                             tmp.pos = j;
                             tmp.index = sstableIndex[level + 1][i].getIndexById(j);
-                            std::unique_lock<std::mutex> lock(toMergePairsMutex);
+                            std::lock_guard<std::mutex> lock(toMergePairsMutex);
                             toMergePairs.push_back(tmp);
                             completed_tasks_count++;
-                            cv.notify_one();
                         });
                     }
-                    std::unique_lock<std::mutex> lock(toMergePairsMutex);
-                    cv.wait(lock, [&] { return completed_tasks_count == tmpCnt; });
+
+                    while (completed_tasks_count < tmpCnt) {
+                        std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+                    }
 
                     toMergeTableNums++;
                     toMergeHeads.push_back(sstableIndex[level + 1][i]);
@@ -486,6 +497,9 @@ void KVStore::compaction() {
 
         maxSSNum *= 2;
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    compactionDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 }
 
 void KVStore::delsstable(std::string filename) {
@@ -622,7 +636,19 @@ void KVStore::load_hnsw_index_from_disk(const std::string &hnsw_data_root)
 
 void KVStore::output()
 {
-    std::cout << "inser cost: " << skipInsertDuration.count() << std::endl;
-    std::cout << "get: cost: " << skipGetDuration.count() << std::endl;
-    std::cout << "delete cost: " << skipDeleteDuration.count() << std::endl;
+    std::cout << "skiplist insert cost: " << skipInsertDuration.count() << std::endl;
+    std::cout << "skiplist get cost: " << skipGetDuration.count() << std::endl;
+    std::cout << "skiplist delete cost: " << skipDeleteDuration.count() << std::endl;
+    std::cout << "compaction cost: " << compactionDuration.count() << std::endl;
+    std::cout << "compaction num: " << compactionNum << std::endl;
+}
+
+void KVStore::testEmtable(int max)
+{
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < max; i++) {
+        e.get(i, pool);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
 }
