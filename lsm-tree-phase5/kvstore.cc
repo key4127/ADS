@@ -594,12 +594,14 @@ std::vector<std::pair<std::uint64_t, std::string>> KVStore::search_knn_hnsw(std:
     std::vector<std::pair<std::uint64_t, std::string>> ans;
 
     for (int i = 0; i < k; i++) {
+        if (key.size() <= i) {
+            break;
+        }
         std::string val = this->get(key[i]);
         ans.push_back(std::make_pair(key[i], val));
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-
     return ans;
 }
 
@@ -610,12 +612,12 @@ void KVStore::load_embedding_from_disk(std::string path)
 
 void KVStore::save_hnsw_index_to_disk(const std::string &hnsw_data_root)
 {
-    h->putFile(hnsw_data_root);
+    h->putFile(hnsw_data_root, pool);
 }
 
 void KVStore::load_hnsw_index_from_disk(const std::string &hnsw_data_root)
 {
-    h->loadFile(hnsw_data_root, e.getDataBlock());
+    h->loadFile(hnsw_data_root, e.getDataBlock(), pool);
 }
 
 void KVStore::output()

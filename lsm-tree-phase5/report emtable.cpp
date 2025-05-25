@@ -42,7 +42,6 @@ int main()
     //store.reset();
 
     const uint64_t max = 50;
-    int pass = 0;
 
     /*for (int i = 0; i < max; i++) {
         store.put(i, text[2 * i + 1]);
@@ -50,35 +49,34 @@ int main()
     for (int i = max; i < 2 * max; i++) {
         store.put(i, text[2 * i + 1]);
         store.del(i - max);
-    }
-    store.save_hnsw_index_to_disk("hnsw_data/");*/
+    }*/
 
-    std::vector<std::pair<std::uint64_t, std::string>> result;
-
-    store.load_hnsw_index_from_disk("hnsw_data/");
-    printf("initialize end\n");
     for (int i = 0; i < max; i++) {
-        result = store.search_knn_hnsw(text[2 * i + 1], 1);
-        if (result.size() >= 1 && result[i].second == text[2 * i + 1]) {
-            std::cout << "Error:" << i << "has not been deleted\n";
+        std::vector<std::pair<std::uint64_t, std::string>> result =
+            store.search_knn(text[2 * i + 1], 1);
+        if (result.size() >= 1 && result[0].second == text[2 * i + 1]) {
+            std::cout << "Error: value[" << i << "] is not correct" << std::endl;
         }
     }
     printf("first part end\n");
     for (int i = max; i < 2 * max; i++) {
-        result = store.search_knn_hnsw(text[2 * i + 1], 1);
-        if (result.size() < 1 || result[0].second != text[2 * i + 1]) {
-            std::cout << i << " is not the best\n";
-        } else {
-            std::cout << i << " pass\n";
-            pass++;
+        std::vector<std::pair<std::uint64_t, std::string>> result =
+            store.search_knn(text[2 * i + 1], 1);
+        if (result.size() == 0) {
+            std::cout << "Error: value[" << i << "] is empty" << std::endl;
+            continue;
+        }
+        if (result[0].second != text[2 * i + 1]) {
+            std::cout << "Error: value[" << i << "] before delete is not correct" << std::endl;
         }
         store.del(i);
-        if (result.size() >= 1 && result[i].second == text[2 * i + 1]) {
-            std::cout << "Error:" << i << "has not been deleted\n";
+        result = store.search_knn(text[2 * i + 1], 1);
+        if (result.size() >= 1 && result[0].second == text[2 * i + 1]) {
+            std::cout << "Error: value[" << i << "] is not correct" << std::endl;
         }
     }
+    printf("all tests end\n");
     
-    std::cout << "Accpet rate: " << (double)pass / max << std::endl;
 
     //auto end = std::chrono::high_resolution_clock::now();
     //std::cout << "Total cost: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";

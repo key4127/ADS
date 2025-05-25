@@ -250,9 +250,9 @@ std::vector<uint64_t> HNSW::query(std::vector<float> vec, int k)
     return ans;
 }
 
-void HNSW::del(uint64_t key, std::vector<float> vec) // to prompt
+void HNSW::del(uint64_t key, std::vector<float> vec)
 {
-    const HWnode *toDelete = nullptr;
+    HWnode *toDelete = nullptr;
     for (int i = nodes.size() - 1; i >= 0; i--) {
         if (nodes[i]->key == key) {
             if (this->deleted.find(i) == deleted.end()) {
@@ -276,7 +276,7 @@ bool HNSW::isDeleted(uint32_t id, std::vector<float> vec)
     return false;
 }
 
-void HNSW::putFile(const std::string &pathDir)
+void HNSW::putFile(const std::string &pathDir, ThreadPool *pool)
 {
     const char *path = pathDir.data();
 
@@ -321,12 +321,26 @@ void HNSW::putFile(const std::string &pathDir)
         utils::mkdir(node_path);
     }
 
-    for (int i = 0; i < nodeNum; i++) {
+    /*for (int i = 0; i < nodeNum; i++) {
         this->putNode(node_string, i);
+    }*/
+    
+    std::atomic<int> complete_task_num(0);
+
+    for (int i = 0; i < nodeNum; i++) {
+        pool->enqueue([node_string, i, &complete_task_num, this]{
+            this->putNode(node_string, i);
+            complete_task_num++;
+        });
     }
+
+    while (complete_task_num < nodeNum) {
+        std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+    }
+    
 }
 
-void HNSW::loadFile(const std::string &pathDir, const std::vector<DataBlock> &data)
+void HNSW::loadFile(const std::string &pathDir, const std::vector<DataBlock> &data, ThreadPool *pool)
 {
     this->reset();
 
@@ -375,9 +389,30 @@ void HNSW::loadFile(const std::string &pathDir, const std::vector<DataBlock> &da
         // node num = 0
         return;
     } else {
+        std::vector<HWnode *> tmpNodes(nodeNum);
+
+        /*for (int i = 0; i < nodeNum; i++) {
+            this->loadNode(node_string, data, i, tmpNodes);
+        }*/
+
+        std::atomic<int> complete_task_num(0);
+
         for (int i = 0; i < nodeNum; i++) {
-            this->loadNode(node_string, data, i);
+            pool->enqueue([node_string, data, i, &tmpNodes, &complete_task_num, this]{
+                this->loadNode(node_string, data, i, tmpNodes);
+                complete_task_num++;
+            });
         }
+
+        while (complete_task_num < nodeNum) {
+            std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+        }
+
+        for (int i = 0; i < tmpNodes.size(); i++) {
+            nodes.push_back(tmpNodes[i]);
+        }
+
+        std::cout << "load success\n";
 
         for (int i = 0; i < nodeNum; i++) {
             if (head[nodes[i]->level] == nullptr) {
@@ -385,6 +420,7 @@ void HNSW::loadFile(const std::string &pathDir, const std::vector<DataBlock> &da
             }
         }
     }
+    printf("load end\n");
 }
 
 void HNSW::putNode(const std::string &pathDir, int k)
@@ -430,7 +466,7 @@ void HNSW::putNode(const std::string &pathDir, int k)
     }
 }
 
-void HNSW::loadNode(const std::string &pathDir, const std::vector<DataBlock> &data, int k)
+void HNSW::loadNode(const std::string &pathDir, const std::vector<DataBlock> &data, int k, std::vector<HWnode *> &tmpNodes)
 {
     std::string nodeDir = pathDir + std::to_string(k) + "/";
     FILE *file;
@@ -477,5 +513,6 @@ void HNSW::loadNode(const std::string &pathDir, const std::vector<DataBlock> &da
         fclose(file);
     }
 
-    nodes.push_back(node);
+    //nodes.push_back(node);
+    tmpNodes[k] = node;
 }

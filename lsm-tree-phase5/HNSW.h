@@ -16,6 +16,7 @@
 #include "embedding.h"
 #include "utils.h"
 #include "emtable.h"
+#include "threadpool.h"
 
 static uint32_t m_M;
 static uint32_t m_L;
@@ -72,7 +73,7 @@ private:
     bool isDeleted(uint32_t id, std::vector<float> vec);
 
     void putNode(const std::string &path, int k);
-    void loadNode(const std::string &path, const std::vector<DataBlock> &data, int k);
+    void loadNode(const std::string &path, const std::vector<DataBlock> &data, int k, std::vector<HWnode *> &tmpNodes);
 
 public:
     HNSW();
@@ -82,8 +83,8 @@ public:
     std::vector<uint64_t> query(std::vector<float> vec, int k);
     void reset();
 
-    void putFile(const std::string &path);
-    void loadFile(const std::string &path, const std::vector<DataBlock> &data);
+    void putFile(const std::string &path, ThreadPool *pool);
+    void loadFile(const std::string &path, const std::vector<DataBlock> &data, ThreadPool *pool);
 };
 
 #endif
