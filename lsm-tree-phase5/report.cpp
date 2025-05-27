@@ -41,12 +41,16 @@ int main()
     auto text = read_file("./data/cleaned_text_100k.txt");
     class KVStore store("./data");
     store.reset();
-
-    const int max = 1000;
-
+    const int max = 10000;
+    auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < max; i++) {
+        if ((i + 1) % 1000 == 0) {
+            std::cout << "Put 1000 items\n";
+        }
         store.put(i, text[i]);
     }
+    auto end = std::chrono::high_resolution_clock::now();
 
-    store.testEmtable(max);
+    store.output();
+    std::cout << "Total Cost: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
 }

@@ -103,6 +103,7 @@ KVStore::~KVStore()
  * No return values for simplicity.
  */
 void KVStore::put(uint64_t key, const std::string &val) {
+    auto f_start = std::chrono::high_resolution_clock::now();
     uint32_t nxtsize = s->getBytes();
     std::string res  = s->search(key);
     if (!res.length()) { // new add
@@ -143,18 +144,20 @@ void KVStore::put(uint64_t key, const std::string &val) {
             skipDeleteDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
         }
     }
+    auto f_end = std::chrono::high_resolution_clock::now();
+    firstInsertDuration += std::chrono::duration_cast<std::chrono::microseconds>(f_end - f_start);
 
+    auto start = std::chrono::high_resolution_clock::now();
     if (val != DEL) {
         h->insert(key, vec);
         e.put(key, vec);
     } else {
-        auto start = std::chrono::high_resolution_clock::now();
         std::vector<float> origin = e.get(key, pool);
-        auto end = std::chrono::high_resolution_clock::now();
         h->del(key, origin);
         e.del(key);
-        skipDeleteDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     }
+    auto end = std::chrono::high_resolution_clock::now();
+    secondInsertDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 }
 
 /**
@@ -637,10 +640,8 @@ void KVStore::load_hnsw_index_from_disk(const std::string &hnsw_data_root)
 void KVStore::output()
 {
     std::cout << "skiplist insert cost: " << skipInsertDuration.count() << std::endl;
-    std::cout << "skiplist get cost: " << skipGetDuration.count() << std::endl;
-    std::cout << "skiplist delete cost: " << skipDeleteDuration.count() << std::endl;
-    std::cout << "compaction cost: " << compactionDuration.count() << std::endl;
-    std::cout << "compaction num: " << compactionNum << std::endl;
+    std::cout << "first insert cost: " << firstInsertDuration.count() << std::endl;
+    std::cout << "second insert cost: " << secondInsertDuration.count() << std::endl;
 }
 
 void KVStore::testEmtable(int max)

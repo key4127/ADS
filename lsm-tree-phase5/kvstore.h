@@ -35,6 +35,9 @@ private:
     std::chrono::microseconds putFileDuration = std::chrono::microseconds(0);
     int compactionNum = 0;
 
+    std::chrono::microseconds firstInsertDuration = std::chrono::microseconds(0);
+    std::chrono::microseconds secondInsertDuration = std::chrono::microseconds(0);
+
     static const uint64_t dimension = 768;
 
     ThreadPool *pool;
