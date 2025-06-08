@@ -127,18 +127,6 @@ void emtable::loadFile(const char *path, ThreadPool *pool) // to empty datablock
             this->dataBlock.push_back(originData[i]);
         }
     }*/
-
-    printf("dimension is %d, size is %d\n", this->dimension, (int)dataBlock.size());
-    if (dataBlock.size() < 5) {
-        return;
-    }
-    for (int i = dataBlock.size() - 1; i >= dataBlock.size() - 5; i--) {
-        std::cout << this->dataBlock[i].key << "    ";
-        for (int j = 0; j < 5; j++) {
-            std::cout << this->dataBlock[i].vec[j] << " ";
-        }
-        std::cout << std::endl;
-    }
 }
 
 void emtable::put(uint64_t key, std::vector<float> vec)

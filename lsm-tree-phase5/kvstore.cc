@@ -66,10 +66,7 @@ KVStore::KVStore(const std::string &dir) :
 
     // e
     std::string hPath = "embedding_data/";
-    std::cout << "begin emtable load\n";
     e.loadFile(hPath.data(), pool);
-    std::cout << "end emtable load\n";
-
     auto end = std::chrono::high_resolution_clock::now();
     readDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 }
@@ -93,7 +90,7 @@ KVStore::~KVStore()
 
     auto end = std::chrono::high_resolution_clock::now();
     putFileDuration += std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Total put file cost: " << putFileDuration.count() << "\n";
+    //std::cout << "Total put file cost: " << putFileDuration.count() << "\n";
 
     delete pool;
 }
